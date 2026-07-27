@@ -94,8 +94,10 @@ class QueueScreen extends StatelessWidget {
                 final tasks = snap.data ?? [];
                 if (tasks.isEmpty) {
                   return const Center(
-                    child: Text('Kuyruk boş.\nGaleri\'den fotoğraf seç.',
-                        textAlign: TextAlign.center),
+                    child: Text(
+                      'Kuyruk boş.\nGaleri\'den fotoğraf seç.',
+                      textAlign: TextAlign.center,
+                    ),
                   );
                 }
                 return ListView.builder(
@@ -128,8 +130,11 @@ class _StatChip extends StatelessWidget {
   final String label;
   final int value;
   final Color color;
-  const _StatChip(
-      {required this.label, required this.value, required this.color});
+  const _StatChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +144,10 @@ class _StatChip extends StatelessWidget {
         Text(
           '$value',
           style: TextStyle(
-              fontSize: 24, fontWeight: FontWeight.bold, color: color),
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
         ),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(fontSize: 11)),
@@ -154,13 +162,13 @@ class _TaskTile extends StatelessWidget {
   const _TaskTile({required this.position, required this.task});
 
   Color _statusColor(UploadStatus s) => switch (s) {
-        UploadStatus.pending => Colors.orange,
-        UploadStatus.uploading => Colors.blue,
-        UploadStatus.completed => Colors.green,
-        UploadStatus.failed => Colors.amber,
-        UploadStatus.permanentlyFailed => Colors.red,
-        UploadStatus.cancelled => Colors.grey,
-      };
+    UploadStatus.pending => Colors.orange,
+    UploadStatus.uploading => Colors.blue,
+    UploadStatus.completed => Colors.green,
+    UploadStatus.failed => Colors.amber,
+    UploadStatus.permanentlyFailed => Colors.red,
+    UploadStatus.cancelled => Colors.grey,
+  };
 
   @override
   Widget build(BuildContext context) {

@@ -74,12 +74,17 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
 
   @override
   Future<UploadTask?> getNextPending(DateTime now) async {
-    final candidates = _tasks.values
-        .where((t) =>
-            t.status == UploadStatus.pending &&
-            (t.nextRetryAt == null || t.nextRetryAt!.isBefore(now) || t.nextRetryAt == now))
-        .toList()
-      ..sort((a, b) => a.sequenceNumber.compareTo(b.sequenceNumber));
+    final candidates =
+        _tasks.values
+            .where(
+              (t) =>
+                  t.status == UploadStatus.pending &&
+                  (t.nextRetryAt == null ||
+                      t.nextRetryAt!.isBefore(now) ||
+                      t.nextRetryAt == now),
+            )
+            .toList()
+          ..sort((a, b) => a.sequenceNumber.compareTo(b.sequenceNumber));
     return candidates.isEmpty ? null : candidates.first;
   }
 
@@ -93,11 +98,12 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   @override
   Future<void> markCompleted(String taskId, {String? checksum}) async {
     _update(
-        taskId,
-        (t) => t.copyWith(
-              status: UploadStatus.completed,
-              checksum: checksum ?? t.checksum,
-            ));
+      taskId,
+      (t) => t.copyWith(
+        status: UploadStatus.completed,
+        checksum: checksum ?? t.checksum,
+      ),
+    );
   }
 
   @override
@@ -108,14 +114,15 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
     DateTime? nextRetryAt,
   }) async {
     _update(
-        taskId,
-        (t) => t.copyWith(
-              status: UploadStatus.failed,
-              failureType: failureType,
-              errorMessage: errorMessage,
-              retryCount: t.retryCount + 1,
-              nextRetryAt: nextRetryAt,
-            ));
+      taskId,
+      (t) => t.copyWith(
+        status: UploadStatus.failed,
+        failureType: failureType,
+        errorMessage: errorMessage,
+        retryCount: t.retryCount + 1,
+        nextRetryAt: nextRetryAt,
+      ),
+    );
   }
 
   @override
@@ -125,51 +132,54 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
     String? errorMessage,
   }) async {
     _update(
-        taskId,
-        (t) => t.copyWith(
-              status: UploadStatus.permanentlyFailed,
-              failureType: failureType,
-              errorMessage: errorMessage,
-            ));
+      taskId,
+      (t) => t.copyWith(
+        status: UploadStatus.permanentlyFailed,
+        failureType: failureType,
+        errorMessage: errorMessage,
+      ),
+    );
   }
 
   @override
   Future<void> markCancelled(String taskId) async {
     // nextRetryAt da null yapılır: §4 Kritik kural #5 (DB tutarlılığı)
     _update(
-        taskId,
-        (t) => UploadTask(
-              taskId: t.taskId,
-              filePath: t.filePath,
-              sequenceNumber: t.sequenceNumber,
-              status: UploadStatus.cancelled,
-              retryCount: t.retryCount,
-              createdAt: t.createdAt,
-              fileSizeBytes: t.fileSizeBytes,
-              metadata: t.metadata,
-              failureType: t.failureType,
-              errorMessage: t.errorMessage,
-              checksum: t.checksum,
-              // nextRetryAt kasıtlı olarak null — iptal edilen görev
-              // backoff zaman damgası taşımamalı
-            ));
+      taskId,
+      (t) => UploadTask(
+        taskId: t.taskId,
+        filePath: t.filePath,
+        sequenceNumber: t.sequenceNumber,
+        status: UploadStatus.cancelled,
+        retryCount: t.retryCount,
+        createdAt: t.createdAt,
+        fileSizeBytes: t.fileSizeBytes,
+        metadata: t.metadata,
+        failureType: t.failureType,
+        errorMessage: t.errorMessage,
+        checksum: t.checksum,
+        // nextRetryAt kasıtlı olarak null — iptal edilen görev
+        // backoff zaman damgası taşımamalı
+      ),
+    );
   }
 
   @override
   Future<void> markPending(String taskId) async {
     _update(
-        taskId,
-        (t) => UploadTask(
-              taskId: t.taskId,
-              filePath: t.filePath,
-              sequenceNumber: t.sequenceNumber,
-              status: UploadStatus.pending,
-              retryCount: 0,
-              createdAt: t.createdAt,
-              fileSizeBytes: t.fileSizeBytes,
-              metadata: t.metadata,
-              // checksum, failureType, errorMessage, nextRetryAt sıfırlanır
-            ));
+      taskId,
+      (t) => UploadTask(
+        taskId: t.taskId,
+        filePath: t.filePath,
+        sequenceNumber: t.sequenceNumber,
+        status: UploadStatus.pending,
+        retryCount: 0,
+        createdAt: t.createdAt,
+        fileSizeBytes: t.fileSizeBytes,
+        metadata: t.metadata,
+        // checksum, failureType, errorMessage, nextRetryAt sıfırlanır
+      ),
+    );
   }
 
   @override
@@ -183,7 +193,10 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   Future<void> updateHeartbeat(String ownerId, DateTime acquiredAt) async {}
 
   @override
-  Future<bool> tryAcquireLock(String ownerId, Duration staleLockThreshold) async {
+  Future<bool> tryAcquireLock(
+    String ownerId,
+    Duration staleLockThreshold,
+  ) async {
     // Test ortamında tek worker varsayımı — her zaman kilidi alabilir.
     // Kilit yarışı testi için ayrı bir fixture kullanın (bkz. §10 test #10).
     return true;
@@ -211,10 +224,10 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
     bool isPaused = false,
     bool pausedDueToAuth = false,
   }) {
-    return _changeNotifier.stream.map((_) => _buildSummary(
-          isPaused: isPaused,
-          pausedDueToAuth: pausedDueToAuth,
-        ));
+    return _changeNotifier.stream.map(
+      (_) =>
+          _buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth),
+    );
   }
 
   QueueSummary _buildSummary({
@@ -281,10 +294,7 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   @override
   Stream<double> watchProgress(String taskId) {
     return _progressControllers
-        .putIfAbsent(
-          taskId,
-          () => StreamController<double>.broadcast(),
-        )
+        .putIfAbsent(taskId, () => StreamController<double>.broadcast())
         .stream;
   }
 
@@ -303,8 +313,7 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
 
   @override
   Future<void> purgeAllFailed() async {
-    _tasks.removeWhere(
-        (_, t) => t.status == UploadStatus.permanentlyFailed);
+    _tasks.removeWhere((_, t) => t.status == UploadStatus.permanentlyFailed);
     _notify();
   }
 

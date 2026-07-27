@@ -83,10 +83,12 @@ class AndroidBackgroundRunner {
       existingWorkPolicy: ExistingWorkPolicy.replace,
       constraints: Constraints(
         networkType: requiresWifi
-            ? NetworkType.unmetered // yalnızca WiFi (metered olmayan)
+            ? NetworkType
+                  .unmetered // yalnızca WiFi (metered olmayan)
             : requiresNetwork
-                ? NetworkType.connected // herhangi bir ağ bağlantısı
-                : NetworkType.not_required,
+            ? NetworkType
+                  .connected // herhangi bir ağ bağlantısı
+            : NetworkType.notRequired,
       ),
     );
   }

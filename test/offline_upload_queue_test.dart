@@ -78,8 +78,8 @@ QueueController makeController({
     adapter: adapter,
     retryPolicy: RetryPolicy(
       maxAttempts: maxAttempts,
-      backoff: backoff ??
-          BackoffStrategy.fixed(const Duration(milliseconds: 10)),
+      backoff:
+          backoff ?? BackoffStrategy.fixed(const Duration(milliseconds: 10)),
     ),
     connectivityMonitor: monitor,
     wifiOnly: wifiOnly,
@@ -181,8 +181,16 @@ void main() {
         ),
       );
       final now = DateTime(2024, 1, 1);
-      final retry0 = policy.nextRetryAt(retryCount: 0, failureType: FailureType.network, from: now);
-      final retry2 = policy.nextRetryAt(retryCount: 2, failureType: FailureType.network, from: now);
+      final retry0 = policy.nextRetryAt(
+        retryCount: 0,
+        failureType: FailureType.network,
+        from: now,
+      );
+      final retry2 = policy.nextRetryAt(
+        retryCount: 2,
+        failureType: FailureType.network,
+        from: now,
+      );
       expect(retry2!.difference(now) >= retry0!.difference(now), isTrue);
     });
   });
@@ -206,11 +214,18 @@ void main() {
       monitor.setStatus(ConnectivityStatus.cellular);
       final adapter = MockUploadAdapter.alwaysSuccess();
       final controller = makeController(
-        adapter: adapter, monitor: monitor, repo: repo, wifiOnly: true,
+        adapter: adapter,
+        monitor: monitor,
+        repo: repo,
+        wifiOnly: true,
       );
       await controller.init();
 
-      await repo.enqueue(taskId: 'task-1', filePath: '/fake/photo.jpg', sequenceNumber: 1);
+      await repo.enqueue(
+        taskId: 'task-1',
+        filePath: '/fake/photo.jpg',
+        sequenceNumber: 1,
+      );
       await Future.delayed(const Duration(milliseconds: 100));
 
       expect(repo.taskFor('task-1')?.status, UploadStatus.pending);
@@ -225,11 +240,19 @@ void main() {
         ..onUploadCalled = (_) => completer.complete();
 
       final controller = makeController(
-        adapter: adapter, monitor: monitor, repo: repo, wifiOnly: true, maxAttempts: 6,
+        adapter: adapter,
+        monitor: monitor,
+        repo: repo,
+        wifiOnly: true,
+        maxAttempts: 6,
       );
       await controller.init();
 
-      await repo.enqueue(taskId: 'task-2', filePath: '/fake/photo.jpg', sequenceNumber: 2);
+      await repo.enqueue(
+        taskId: 'task-2',
+        filePath: '/fake/photo.jpg',
+        sequenceNumber: 2,
+      );
       await controller.forceUploadOnce();
       await completer.future.timeout(const Duration(seconds: 2));
 
@@ -241,11 +264,18 @@ void main() {
     test('pause() aktifken forceUploadOnce() görev işlemez', () async {
       final adapter = MockUploadAdapter.alwaysSuccess();
       final controller = makeController(
-        adapter: adapter, monitor: monitor, repo: repo, wifiOnly: true,
+        adapter: adapter,
+        monitor: monitor,
+        repo: repo,
+        wifiOnly: true,
       );
       await controller.init();
 
-      await repo.enqueue(taskId: 'task-3', filePath: '/fake/photo.jpg', sequenceNumber: 3);
+      await repo.enqueue(
+        taskId: 'task-3',
+        filePath: '/fake/photo.jpg',
+        sequenceNumber: 3,
+      );
       controller.pause();
       await controller.forceUploadOnce();
       await Future.delayed(const Duration(milliseconds: 100));
@@ -258,12 +288,24 @@ void main() {
     test('fileNotFound → ilk denemede permanentlyFailed', () async {
       final adapter = MockUploadAdapter.alwaysFailure(FailureType.fileNotFound);
       final completer = Completer<void>();
-      final controller = makeController(adapter: adapter, monitor: monitor, repo: repo);
+      final controller = makeController(
+        adapter: adapter,
+        monitor: monitor,
+        repo: repo,
+      );
       await controller.init();
 
-      await repo.enqueue(taskId: 'task-4', filePath: '/fake/photo.jpg', sequenceNumber: 4);
-      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((tasks) {
-        if (tasks.any((t) => t.taskId == 'task-4') && !completer.isCompleted) completer.complete();
+      await repo.enqueue(
+        taskId: 'task-4',
+        filePath: '/fake/photo.jpg',
+        sequenceNumber: 4,
+      );
+      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
+        tasks,
+      ) {
+        if (tasks.any((t) => t.taskId == 'task-4') && !completer.isCompleted) {
+          completer.complete();
+        }
       });
 
       await completer.future.timeout(const Duration(seconds: 2));
@@ -276,13 +318,24 @@ void main() {
       final adapter = MockUploadAdapter.alwaysFailure(FailureType.network);
       final completer = Completer<void>();
       final controller = makeController(
-        adapter: adapter, monitor: monitor, repo: repo, maxAttempts: 2,
+        adapter: adapter,
+        monitor: monitor,
+        repo: repo,
+        maxAttempts: 2,
       );
       await controller.init();
 
-      await repo.enqueue(taskId: 'task-5', filePath: '/fake/photo.jpg', sequenceNumber: 5);
-      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((tasks) {
-        if (tasks.any((t) => t.taskId == 'task-5') && !completer.isCompleted) completer.complete();
+      await repo.enqueue(
+        taskId: 'task-5',
+        filePath: '/fake/photo.jpg',
+        sequenceNumber: 5,
+      );
+      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
+        tasks,
+      ) {
+        if (tasks.any((t) => t.taskId == 'task-5') && !completer.isCompleted) {
+          completer.complete();
+        }
       });
 
       await completer.future.timeout(const Duration(seconds: 3));
@@ -290,27 +343,46 @@ void main() {
       await controller.dispose();
     });
 
-    test('maxAttempts:1 → failed geçmeden doğrudan permanentlyFailed', () async {
-      final adapter = MockUploadAdapter.alwaysFailure(FailureType.network);
-      final completer = Completer<void>();
-      final controller = makeController(
-        adapter: adapter, monitor: monitor, repo: repo, maxAttempts: 1,
-      );
-      await controller.init();
+    test(
+      'maxAttempts:1 → failed geçmeden doğrudan permanentlyFailed',
+      () async {
+        final adapter = MockUploadAdapter.alwaysFailure(FailureType.network);
+        final completer = Completer<void>();
+        final controller = makeController(
+          adapter: adapter,
+          monitor: monitor,
+          repo: repo,
+          maxAttempts: 1,
+        );
+        await controller.init();
 
-      await repo.enqueue(taskId: 'task-6', filePath: '/fake/photo.jpg', sequenceNumber: 6);
-      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((tasks) {
-        if (tasks.any((t) => t.taskId == 'task-6') && !completer.isCompleted) completer.complete();
-      });
+        await repo.enqueue(
+          taskId: 'task-6',
+          filePath: '/fake/photo.jpg',
+          sequenceNumber: 6,
+        );
+        repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
+          tasks,
+        ) {
+          if (tasks.any((t) => t.taskId == 'task-6') &&
+              !completer.isCompleted) {
+            completer.complete();
+          }
+        });
 
-      await completer.future.timeout(const Duration(seconds: 2));
-      expect(repo.taskFor('task-6')?.status, UploadStatus.permanentlyFailed);
-      expect(adapter.callCount, 1);
-      await controller.dispose();
-    });
+        await completer.future.timeout(const Duration(seconds: 2));
+        expect(repo.taskFor('task-6')?.status, UploadStatus.permanentlyFailed);
+        expect(adapter.callCount, 1);
+        await controller.dispose();
+      },
+    );
 
     test('init() uploading → pending recovery yapar', () async {
-      await repo.enqueue(taskId: 'task-7', filePath: '/fake/photo.jpg', sequenceNumber: 7);
+      await repo.enqueue(
+        taskId: 'task-7',
+        filePath: '/fake/photo.jpg',
+        sequenceNumber: 7,
+      );
       await repo.markUploading('task-7');
       expect(repo.taskFor('task-7')?.status, UploadStatus.uploading);
 
@@ -320,18 +392,36 @@ void main() {
     });
 
     test('watchTasks({pending}) yalnızca pending döner', () async {
-      await repo.enqueue(taskId: 'task-8a', filePath: '/fake/a.jpg', sequenceNumber: 8);
-      await repo.enqueue(taskId: 'task-8b', filePath: '/fake/b.jpg', sequenceNumber: 9);
+      await repo.enqueue(
+        taskId: 'task-8a',
+        filePath: '/fake/a.jpg',
+        sequenceNumber: 8,
+      );
+      await repo.enqueue(
+        taskId: 'task-8b',
+        filePath: '/fake/b.jpg',
+        sequenceNumber: 9,
+      );
       await repo.markCompleted('task-8b');
 
-      final tasks = await repo.watchTasks(statuses: {UploadStatus.pending}).first;
+      final tasks = await repo
+          .watchTasks(statuses: {UploadStatus.pending})
+          .first;
       expect(tasks.length, 1);
       expect(tasks.first.taskId, 'task-8a');
     });
 
     test('purgeAllCompleted() → completed kayıtlar silinir', () async {
-      await repo.enqueue(taskId: 'task-9a', filePath: '/fake/a.jpg', sequenceNumber: 10);
-      await repo.enqueue(taskId: 'task-9b', filePath: '/fake/b.jpg', sequenceNumber: 11);
+      await repo.enqueue(
+        taskId: 'task-9a',
+        filePath: '/fake/a.jpg',
+        sequenceNumber: 10,
+      );
+      await repo.enqueue(
+        taskId: 'task-9b',
+        filePath: '/fake/b.jpg',
+        sequenceNumber: 11,
+      );
       await repo.markCompleted('task-9a');
 
       await repo.purgeAllCompleted();
@@ -341,41 +431,50 @@ void main() {
       expect(all.any((t) => t.taskId == 'task-9b'), isTrue);
     });
 
-    test('diskUsageWarning eşiği aşılınca onDiskUsageWarning çağrılır', () async {
-      int? capturedCurrent;
-      int? capturedWarning;
+    test(
+      'diskUsageWarning eşiği aşılınca onDiskUsageWarning çağrılır',
+      () async {
+        int? capturedCurrent;
+        int? capturedWarning;
 
-      final advanced = UploadQueueAdvancedOptions(
-        heartbeatInterval: const Duration(milliseconds: 50),
-        staleLockThreshold: const Duration(milliseconds: 200),
-        diskUsageWarningBytes: 100,
-        onDiskUsageWarning: (current, warning) {
-          capturedCurrent = current;
-          capturedWarning = warning;
-        },
-      );
+        final advanced = UploadQueueAdvancedOptions(
+          heartbeatInterval: const Duration(milliseconds: 50),
+          staleLockThreshold: const Duration(milliseconds: 200),
+          diskUsageWarningBytes: 100,
+          onDiskUsageWarning: (current, warning) {
+            capturedCurrent = current;
+            capturedWarning = warning;
+          },
+        );
 
-      final controller = makeController(
-        adapter: MockUploadAdapter.alwaysSuccess(),
-        monitor: monitor, repo: repo, advanced: advanced,
-      );
-      await controller.init();
+        final controller = makeController(
+          adapter: MockUploadAdapter.alwaysSuccess(),
+          monitor: monitor,
+          repo: repo,
+          advanced: advanced,
+        );
+        await controller.init();
 
-      await repo.enqueue(
-        taskId: 'task-10', filePath: '/fake/photo.jpg', sequenceNumber: 12, fileSizeBytes: 200,
-      );
-      await Future.delayed(const Duration(milliseconds: 200));
+        await repo.enqueue(
+          taskId: 'task-10',
+          filePath: '/fake/photo.jpg',
+          sequenceNumber: 12,
+          fileSizeBytes: 200,
+        );
+        await Future.delayed(const Duration(milliseconds: 200));
 
-      expect(capturedCurrent, isNotNull);
-      expect(capturedCurrent, greaterThan(100));
-      expect(capturedWarning, 100);
-      await controller.dispose();
-    });
+        expect(capturedCurrent, isNotNull);
+        expect(capturedCurrent, greaterThan(100));
+        expect(capturedWarning, 100);
+        await controller.dispose();
+      },
+    );
 
     test('onLog null bırakılınca hiçbir exception fırlatılmaz', () async {
       final controller = makeController(
         adapter: MockUploadAdapter.alwaysSuccess(),
-        monitor: monitor, repo: repo,
+        monitor: monitor,
+        repo: repo,
         advanced: const UploadQueueAdvancedOptions(),
       );
       await expectLater(() async => await controller.init(), returnsNormally);
@@ -383,8 +482,16 @@ void main() {
     });
 
     test('purgeAllCancelled() → cancelled kayıtlar temizlenir', () async {
-      await repo.enqueue(taskId: 'task-12a', filePath: '/fake/a.jpg', sequenceNumber: 13);
-      await repo.enqueue(taskId: 'task-12b', filePath: '/fake/b.jpg', sequenceNumber: 14);
+      await repo.enqueue(
+        taskId: 'task-12a',
+        filePath: '/fake/a.jpg',
+        sequenceNumber: 13,
+      );
+      await repo.enqueue(
+        taskId: 'task-12b',
+        filePath: '/fake/b.jpg',
+        sequenceNumber: 14,
+      );
       await repo.markCancelled('task-12a');
 
       await repo.purgeAllCancelled();
@@ -393,17 +500,35 @@ void main() {
       expect(repo.taskFor('task-12b'), isNotNull);
     });
 
-    test('estimatedDiskUsageBytes = pending+failed+cancelled toplamı', () async {
-      await repo.enqueue(taskId: 'disk-1', filePath: '/fake/a.jpg', sequenceNumber: 15, fileSizeBytes: 100);
-      await repo.enqueue(taskId: 'disk-2', filePath: '/fake/b.jpg', sequenceNumber: 16, fileSizeBytes: 200);
-      await repo.markCompleted('disk-2');
+    test(
+      'estimatedDiskUsageBytes = pending+failed+cancelled toplamı',
+      () async {
+        await repo.enqueue(
+          taskId: 'disk-1',
+          filePath: '/fake/a.jpg',
+          sequenceNumber: 15,
+          fileSizeBytes: 100,
+        );
+        await repo.enqueue(
+          taskId: 'disk-2',
+          filePath: '/fake/b.jpg',
+          sequenceNumber: 16,
+          fileSizeBytes: 200,
+        );
+        await repo.markCompleted('disk-2');
 
-      await repo.enqueue(taskId: 'disk-trigger', filePath: '/fake/c.jpg', sequenceNumber: 17, fileSizeBytes: 0);
-      await repo.purge('disk-trigger');
+        await repo.enqueue(
+          taskId: 'disk-trigger',
+          filePath: '/fake/c.jpg',
+          sequenceNumber: 17,
+          fileSizeBytes: 0,
+        );
+        await repo.purge('disk-trigger');
 
-      final summary = await repo.watchSummary().first;
-      expect(summary.estimatedDiskUsageBytes, 100);
-    });
+        final summary = await repo.watchSummary().first;
+        expect(summary.estimatedDiskUsageBytes, 100);
+      },
+    );
   });
 
   // ── Aşama 2 — Yeni testler ─────────────────────────────────────────────────
@@ -421,34 +546,54 @@ void main() {
       monitor.dispose();
     });
 
-    test('markCancelled() → nextRetryAt null olur (§4 Kritik kural #5)', () async {
-      await repo.enqueue(taskId: 'cancel-1', filePath: '/fake/photo.jpg', sequenceNumber: 100);
-      await repo.markFailed(
-        'cancel-1',
-        failureType: FailureType.network,
-        nextRetryAt: DateTime.now().add(const Duration(minutes: 5)),
-      );
-      expect(repo.taskFor('cancel-1')?.nextRetryAt, isNotNull);
+    test(
+      'markCancelled() → nextRetryAt null olur (§4 Kritik kural #5)',
+      () async {
+        await repo.enqueue(
+          taskId: 'cancel-1',
+          filePath: '/fake/photo.jpg',
+          sequenceNumber: 100,
+        );
+        await repo.markFailed(
+          'cancel-1',
+          failureType: FailureType.network,
+          nextRetryAt: DateTime.now().add(const Duration(minutes: 5)),
+        );
+        expect(repo.taskFor('cancel-1')?.nextRetryAt, isNotNull);
 
-      await repo.markCancelled('cancel-1');
-      expect(repo.taskFor('cancel-1')?.status, UploadStatus.cancelled);
-    });
+        await repo.markCancelled('cancel-1');
+        expect(repo.taskFor('cancel-1')?.status, UploadStatus.cancelled);
+      },
+    );
 
     test('getNextSequenceNumber() → her çağrıda artar', () async {
       final seq1 = await repo.getNextSequenceNumber();
-      await repo.enqueue(taskId: 'seq-1', filePath: '/fake/a.jpg', sequenceNumber: seq1);
+      await repo.enqueue(
+        taskId: 'seq-1',
+        filePath: '/fake/a.jpg',
+        sequenceNumber: seq1,
+      );
 
       final seq2 = await repo.getNextSequenceNumber();
-      await repo.enqueue(taskId: 'seq-2', filePath: '/fake/b.jpg', sequenceNumber: seq2);
+      await repo.enqueue(
+        taskId: 'seq-2',
+        filePath: '/fake/b.jpg',
+        sequenceNumber: seq2,
+      );
 
       expect(seq2, greaterThan(seq1));
     });
 
     test('QueueSummary.copyWith() → yalnızca belirtilen alanlar değişir', () {
       const original = QueueSummary(
-        pending: 5, uploading: 1, completed: 10, failed: 2,
-        permanentlyFailed: 0, cancelled: 0,
-        isPaused: false, pausedDueToAuth: false,
+        pending: 5,
+        uploading: 1,
+        completed: 10,
+        failed: 2,
+        permanentlyFailed: 0,
+        cancelled: 0,
+        isPaused: false,
+        pausedDueToAuth: false,
         estimatedDiskUsageBytes: 1024,
       );
 
@@ -469,21 +614,32 @@ void main() {
       final completedCompleter = Completer<void>();
 
       final controller = makeController(
-        adapter: adapter, monitor: monitor, repo: repo, maxAttempts: 1,
+        adapter: adapter,
+        monitor: monitor,
+        repo: repo,
+        maxAttempts: 1,
       );
       await controller.init();
 
-      await repo.enqueue(taskId: 'retry-1', filePath: '/fake/photo.jpg', sequenceNumber: 200);
+      await repo.enqueue(
+        taskId: 'retry-1',
+        filePath: '/fake/photo.jpg',
+        sequenceNumber: 200,
+      );
 
-      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((tasks) {
-        if (tasks.any((t) => t.taskId == 'retry-1') && !permanentCompleter.isCompleted) {
+      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
+        tasks,
+      ) {
+        if (tasks.any((t) => t.taskId == 'retry-1') &&
+            !permanentCompleter.isCompleted) {
           permanentCompleter.complete();
         }
       });
       await permanentCompleter.future.timeout(const Duration(seconds: 2));
 
       repo.watchTasks(statuses: {UploadStatus.completed}).listen((tasks) {
-        if (tasks.any((t) => t.taskId == 'retry-1') && !completedCompleter.isCompleted) {
+        if (tasks.any((t) => t.taskId == 'retry-1') &&
+            !completedCompleter.isCompleted) {
           completedCompleter.complete();
         }
       });
@@ -495,22 +651,40 @@ void main() {
       await controller.dispose();
     });
 
-    test('nextRetryAt gelecekte olan failed görev getNextPending() sonucu değil', () async {
-      await repo.enqueue(taskId: 'backoff-1', filePath: '/fake/photo.jpg', sequenceNumber: 300);
-      await repo.markFailed(
-        'backoff-1',
-        failureType: FailureType.network,
-        nextRetryAt: DateTime.now().add(const Duration(hours: 1)),
-      );
+    test(
+      'nextRetryAt gelecekte olan failed görev getNextPending() sonucu değil',
+      () async {
+        await repo.enqueue(
+          taskId: 'backoff-1',
+          filePath: '/fake/photo.jpg',
+          sequenceNumber: 300,
+        );
+        await repo.markFailed(
+          'backoff-1',
+          failureType: FailureType.network,
+          nextRetryAt: DateTime.now().add(const Duration(hours: 1)),
+        );
 
-      final task = await repo.getNextPending(DateTime.now());
-      expect(task, isNull);
-    });
+        final task = await repo.getNextPending(DateTime.now());
+        expect(task, isNull);
+      },
+    );
 
     test('purgeAllFailed() → yalnızca permanentlyFailed silinir', () async {
-      await repo.enqueue(taskId: 'pf-1', filePath: '/fake/a.jpg', sequenceNumber: 400);
-      await repo.enqueue(taskId: 'pf-2', filePath: '/fake/b.jpg', sequenceNumber: 401);
-      await repo.markPermanentlyFailed('pf-1', failureType: FailureType.badRequest);
+      await repo.enqueue(
+        taskId: 'pf-1',
+        filePath: '/fake/a.jpg',
+        sequenceNumber: 400,
+      );
+      await repo.enqueue(
+        taskId: 'pf-2',
+        filePath: '/fake/b.jpg',
+        sequenceNumber: 401,
+      );
+      await repo.markPermanentlyFailed(
+        'pf-1',
+        failureType: FailureType.badRequest,
+      );
 
       await repo.purgeAllFailed();
 
@@ -562,11 +736,13 @@ void main() {
       final c2 = makeController();
       expect(
         () => c2.init(),
-        throwsA(isA<StateError>().having(
-          (e) => e.message,
-          'message',
-          contains('already initialized'),
-        )),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('already initialized'),
+          ),
+        ),
       );
 
       await c1.dispose();
@@ -607,11 +783,13 @@ void main() {
 
       expect(
         () => c.init(),
-        throwsA(isA<ArgumentError>().having(
-          (e) => e.message,
-          'message',
-          contains('staleLockThreshold'),
-        )),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('staleLockThreshold'),
+          ),
+        ),
       );
 
       QueueController.resetForTesting('stale-arg-box');
@@ -629,7 +807,8 @@ void main() {
       final emptyCompleter = Completer<void>();
       bool hasPending = false;
 
-      final controller = StreamController<({int pending, int uploading})>.broadcast();
+      final controller =
+          StreamController<({int pending, int uploading})>.broadcast();
 
       final sub = controller.stream.listen((summary) {
         hasPending = summary.pending > 0 || summary.uploading > 0;
@@ -657,7 +836,8 @@ void main() {
       bool hasPending = false;
       const shortTimeout = Duration(milliseconds: 50);
 
-      final controller = StreamController<({int pending, int uploading})>.broadcast();
+      final controller =
+          StreamController<({int pending, int uploading})>.broadcast();
 
       final sub = controller.stream.listen((summary) {
         hasPending = summary.pending > 0 || summary.uploading > 0;
@@ -681,36 +861,40 @@ void main() {
       expect(hasPending, isTrue);
     });
 
-    test('emptyCompleter birden fazla event gelse de tek kez tamamlanır', () async {
-      final emptyCompleter = Completer<void>();
-      int completeCount = 0;
+    test(
+      'emptyCompleter birden fazla event gelse de tek kez tamamlanır',
+      () async {
+        final emptyCompleter = Completer<void>();
+        int completeCount = 0;
 
-      final controller = StreamController<({int pending, int uploading})>.broadcast();
+        final controller =
+            StreamController<({int pending, int uploading})>.broadcast();
 
-      final sub = controller.stream.listen((summary) {
-        final isEmpty = summary.pending == 0 && summary.uploading == 0;
-        if (isEmpty && !emptyCompleter.isCompleted) {
-          emptyCompleter.complete();
-          completeCount++;
-        }
-      });
+        final sub = controller.stream.listen((summary) {
+          final isEmpty = summary.pending == 0 && summary.uploading == 0;
+          if (isEmpty && !emptyCompleter.isCompleted) {
+            emptyCompleter.complete();
+            completeCount++;
+          }
+        });
 
-      // Birden fazla "boş" eventi gönder
-      controller.add((pending: 0, uploading: 0));
-      controller.add((pending: 0, uploading: 0));
-      controller.add((pending: 0, uploading: 0));
+        // Birden fazla "boş" eventi gönder
+        controller.add((pending: 0, uploading: 0));
+        controller.add((pending: 0, uploading: 0));
+        controller.add((pending: 0, uploading: 0));
 
-      await Future.any([
-        emptyCompleter.future,
-        Future<void>.delayed(const Duration(milliseconds: 100)),
-      ]);
+        await Future.any([
+          emptyCompleter.future,
+          Future<void>.delayed(const Duration(milliseconds: 100)),
+        ]);
 
-      await sub.cancel();
-      await controller.close();
+        await sub.cancel();
+        await controller.close();
 
-      // isCompleted koruması sayesinde complete() yalnızca bir kez çağrıldı
-      expect(completeCount, 1);
-    });
+        // isCompleted koruması sayesinde complete() yalnızca bir kez çağrıldı
+        expect(completeCount, 1);
+      },
+    );
 
     // ── Aşama 3: IosBackgroundChannel handler yönlendirme testi ──────────────
     group('IosBackgroundChannel setMethodCallHandler yönlendirmesi', () {

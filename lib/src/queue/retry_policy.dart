@@ -23,8 +23,7 @@ sealed class BackoffStrategy {
   }) = ExponentialBackoffStrategy;
 
   /// Her denemede sabit bekleme süresi.
-  const factory BackoffStrategy.fixed(Duration duration) =
-      FixedBackoffStrategy;
+  const factory BackoffStrategy.fixed(Duration duration) = FixedBackoffStrategy;
 
   /// [retryCount] denemesinden sonra beklenmesi gereken süre.
   ///
@@ -39,9 +38,8 @@ final class ExponentialBackoffStrategy extends BackoffStrategy {
   final Duration max;
 
   const ExponentialBackoffStrategy({required this.base, required this.max})
-      : assert(
-            base != Duration.zero, 'base sıfır olamaz — sonsuz döngü riski'),
-        assert(max > base, 'max, base değerinden büyük olmalı');
+    : assert(base != Duration.zero, 'base sıfır olamaz — sonsuz döngü riski'),
+      assert(max > base, 'max, base değerinden büyük olmalı');
 
   @override
   Duration compute(int retryCount) {
@@ -94,10 +92,7 @@ class RetryPolicy {
   /// Denemeler arası bekleme stratejisi.
   final BackoffStrategy backoff;
 
-  const RetryPolicy({
-    required this.maxAttempts,
-    required this.backoff,
-  });
+  const RetryPolicy({required this.maxAttempts, required this.backoff});
 
   /// Bu [failureType] kalıcı bir hata mı?
   ///

@@ -51,16 +51,23 @@ class DiskScreen extends StatelessWidget {
                       Text(
                         _formatBytes(diskBytes),
                         style: const TextStyle(
-                            fontSize: 32, fontWeight: FontWeight.bold),
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const Text('Tahmini Disk Kullanımı',
-                          style: TextStyle(fontSize: 13)),
+                      const Text(
+                        'Tahmini Disk Kullanımı',
+                        style: TextStyle(fontSize: 13),
+                      ),
                       const SizedBox(height: 8),
                       const Text(
                         'copyToSandbox: true → pending/failed görevlerin\n'
                         'sandbox kopyaları burada sayılır (~2× disk maliyeti).',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                     ],
                   ),
@@ -75,20 +82,26 @@ class DiskScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Durum Özeti',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15)),
+                      const Text(
+                        'Durum Özeti',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       _SummaryRow('pending', s.pending, Colors.orange),
                       _SummaryRow('uploading', s.uploading, Colors.blue),
                       _SummaryRow('completed', s.completed, Colors.green),
                       _SummaryRow('failed', s.failed, Colors.amber),
                       _SummaryRow(
-                          'permanentlyFailed', s.permanentlyFailed, Colors.red),
+                        'permanentlyFailed',
+                        s.permanentlyFailed,
+                        Colors.red,
+                      ),
                       _SummaryRow('cancelled', s.cancelled, Colors.grey),
                       const Divider(),
-                      _SummaryRow('TOPLAM', s.total,
-                          theme.colorScheme.primary),
+                      _SummaryRow('TOPLAM', s.total, theme.colorScheme.primary),
                     ],
                   ),
                 ),
@@ -96,8 +109,10 @@ class DiskScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // Temizleme butonları
-              const Text('Temizlik',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const Text(
+                'Temizlik',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
               const SizedBox(height: 8),
 
               FilledButton.tonal(
@@ -123,7 +138,8 @@ class DiskScreen extends StatelessWidget {
                   foregroundColor: Colors.redAccent,
                 ),
                 child: Text(
-                    'Kalıcı Hataları Sil (${s.permanentlyFailed} kayıt)'),
+                  'Kalıcı Hataları Sil (${s.permanentlyFailed} kayıt)',
+                ),
               ),
             ],
           );
@@ -145,14 +161,19 @@ class _SummaryRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          Container(width: 10, height: 10,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 10),
           Expanded(
-              child: Text(label,
-                  style: const TextStyle(fontFamily: 'monospace'))),
-          Text('$count',
-              style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+            child: Text(label, style: const TextStyle(fontFamily: 'monospace')),
+          ),
+          Text(
+            '$count',
+            style: TextStyle(fontWeight: FontWeight.bold, color: color),
+          ),
         ],
       ),
     );

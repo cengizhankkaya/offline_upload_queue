@@ -135,13 +135,15 @@ class UploadQueue {
   Future<void> init() async {
     if (_initialized) return;
 
-    final effectiveBackoff = backoff ??
+    final effectiveBackoff =
+        backoff ??
         BackoffStrategy.exponential(
           base: const Duration(seconds: 2),
           max: const Duration(minutes: 10),
         );
 
-    final effectiveMonitor = connectivityMonitor ?? DefaultConnectivityMonitor();
+    final effectiveMonitor =
+        connectivityMonitor ?? DefaultConnectivityMonitor();
     final db = QueueDatabase();
     final repo = DriftPersistenceRepository(db);
 
@@ -275,7 +277,10 @@ class UploadQueue {
   }) {
     _assertInitialized();
     return _controller.watchTasks(
-        statuses: statuses, limit: limit, offset: offset);
+      statuses: statuses,
+      limit: limit,
+      offset: offset,
+    );
   }
 
   /// Tek bir görevin upload ilerleme oranını (0.0–1.0) yayınlayan stream.

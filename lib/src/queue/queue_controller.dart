@@ -84,17 +84,17 @@ class QueueController {
     Future<void> Function()? onAuthExpired,
     Duration authTimeout = const Duration(seconds: 30),
     UploadQueueAdvancedOptions advanced = const UploadQueueAdvancedOptions(),
-  })  : _repo = repository,
-        _adapter = adapter,
-        _retryPolicy = retryPolicy,
-        _connectivityMonitor = connectivityMonitor,
-        _wifiOnly = wifiOnly,
-        _verifyChecksum = verifyChecksum,
-        _copyToSandbox = copyToSandbox,
-        _boxName = boxName,
-        _onAuthExpired = onAuthExpired,
-        _authTimeout = authTimeout,
-        _advanced = advanced;
+  }) : _repo = repository,
+       _adapter = adapter,
+       _retryPolicy = retryPolicy,
+       _connectivityMonitor = connectivityMonitor,
+       _wifiOnly = wifiOnly,
+       _verifyChecksum = verifyChecksum,
+       _copyToSandbox = copyToSandbox,
+       _boxName = boxName,
+       _onAuthExpired = onAuthExpired,
+       _authTimeout = authTimeout,
+       _advanced = advanced;
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -229,8 +229,9 @@ class QueueController {
 
     // 3. Sandbox kopyalama (copyToSandbox: true ise)
     final taskId = const Uuid().v4();
-    final actualPath =
-        _copyToSandbox ? await _copyToSandboxDir(filePath, taskId) : filePath;
+    final actualPath = _copyToSandbox
+        ? await _copyToSandboxDir(filePath, taskId)
+        : filePath;
 
     // 4. fileSizeBytes — stat() (sandbox kopyası üzerinde)
     final fileSizeBytes = await _statFile(actualPath);
@@ -282,11 +283,9 @@ class QueueController {
     _assertDisposed();
     if (_paused) return; // pause() > forceUploadOnce()
 
-    final pending = await _repo.watchTasks(
-      statuses: {UploadStatus.pending},
-      limit: 1000,
-      offset: 0,
-    ).first;
+    final pending = await _repo
+        .watchTasks(statuses: {UploadStatus.pending}, limit: 1000, offset: 0)
+        .first;
 
     _forceUploadSnapshot.addAll(pending.map((t) => t.taskId));
     _triggerWorker();
@@ -300,14 +299,11 @@ class QueueController {
     // flatMap: her repo değişikliğinde güncel _paused/_pausedDueToAuth ile
     // taze bir QueueSummary üretilir
     return _repo
-        .watchSummary(
-          isPaused: _paused,
-          pausedDueToAuth: _pausedDueToAuth,
-        )
-        .map((s) => s.copyWith(
-              isPaused: _paused,
-              pausedDueToAuth: _pausedDueToAuth,
-            ));
+        .watchSummary(isPaused: _paused, pausedDueToAuth: _pausedDueToAuth)
+        .map(
+          (s) =>
+              s.copyWith(isPaused: _paused, pausedDueToAuth: _pausedDueToAuth),
+        );
   }
 
   /// Filtrelenmiş görev listesini yayınlayan stream.
@@ -387,8 +383,10 @@ class QueueController {
     } catch (e) {
       // Dosya okunamıyor — kısa retry mekanizması (3 deneme, bkz. Bölüm 3)
       if (task.retryCount < 2) {
-        _log('Checksum hatası (deneme ${task.retryCount + 1}/3): $e',
-            level: LogLevel.warning);
+        _log(
+          'Checksum hatası (deneme ${task.retryCount + 1}/3): $e',
+          level: LogLevel.warning,
+        );
         await _repo.markFailed(
           task.taskId,
           failureType: FailureType.network,
@@ -400,8 +398,9 @@ class QueueController {
         );
       } else {
         _log(
-            'Dosya okunamıyor, corruptFile olarak işaretleniyor: ${task.taskId}',
-            level: LogLevel.warning);
+          'Dosya okunamıyor, corruptFile olarak işaretleniyor: ${task.taskId}',
+          level: LogLevel.warning,
+        );
         await _repo.markPermanentlyFailed(
           task.taskId,
           failureType: FailureType.corruptFile,
@@ -466,12 +465,10 @@ class QueueController {
         remoteChecksum != null &&
         remoteChecksum != localChecksum) {
       _log(
-          'Checksum uyuşmazlığı: ${task.taskId} — yerel: $localChecksum, uzak: $remoteChecksum',
-          level: LogLevel.warning);
-      await _handleFailure(
-        task,
-        UploadResult.failure(FailureType.network),
+        'Checksum uyuşmazlığı: ${task.taskId} — yerel: $localChecksum, uzak: $remoteChecksum',
+        level: LogLevel.warning,
       );
+      await _handleFailure(task, UploadResult.failure(FailureType.network));
       return;
     }
 
@@ -483,8 +480,10 @@ class QueueController {
         final file = File(task.filePath);
         if (await file.exists()) await file.delete();
       } catch (e) {
-        _log('Sandbox dosyası silinemedi: ${task.filePath}: $e',
-            level: LogLevel.warning);
+        _log(
+          'Sandbox dosyası silinemedi: ${task.filePath}: $e',
+          level: LogLevel.warning,
+        );
       }
     }
   }
@@ -512,7 +511,10 @@ class QueueController {
         return;
       } catch (e) {
         _pausedDueToAuth = false;
-        _log('Auth callback başarısız veya timeout: $e', level: LogLevel.warning);
+        _log(
+          'Auth callback başarısız veya timeout: $e',
+          level: LogLevel.warning,
+        );
         // Normal failed/backoff akışına düş (aşağıda devam eder)
       }
     }
@@ -585,7 +587,6 @@ class QueueController {
       }
     });
   }
-
 
   // ── Dispose ───────────────────────────────────────────────────────────────
 
@@ -670,7 +671,9 @@ class QueueController {
 
   void _assertDisposed() {
     if (_disposed) {
-      throw StateError('QueueController.dispose() çağrıldıktan sonra kullanılamaz');
+      throw StateError(
+        'QueueController.dispose() çağrıldıktan sonra kullanılamaz',
+      );
     }
   }
 

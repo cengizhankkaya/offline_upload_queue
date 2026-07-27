@@ -44,11 +44,8 @@ class RestUploadAdapter implements UploadAdapter {
   /// Örnek: `() async => 'Bearer ${await tokenStore.getToken()}'`
   final Future<String> Function()? authHeaderProvider;
 
-  RestUploadAdapter({
-    required this.baseUrl,
-    this.authHeaderProvider,
-    Dio? dio,
-  }) : _dio = dio ?? Dio();
+  RestUploadAdapter({required this.baseUrl, this.authHeaderProvider, Dio? dio})
+    : _dio = dio ?? Dio();
 
   @override
   Future<UploadResult> uploadFile({

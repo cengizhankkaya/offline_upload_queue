@@ -25,7 +25,8 @@ part 'database.g.dart';
 ///   güncelleyebilir (v1 → v3 doğrudan).
 @DriftDatabase(tables: [UploadTasks, ActiveWorkerLock])
 class QueueDatabase extends _$QueueDatabase {
-  QueueDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
+  QueueDatabase([QueryExecutor? executor])
+    : super(executor ?? _openConnection());
 
   /// Birim testlerde in-memory veritabanı kullanmak için:
   /// ```dart
@@ -38,27 +39,27 @@ class QueueDatabase extends _$QueueDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) => m.createAll(),
-        onUpgrade: (m, from, to) async {
-          // v1 → v2 ve sonrası için örnek şablon:
-          //
-          // if (from < 2) {
-          //   await m.addColumn(uploadTasks, uploadTasks.someNewColumn);
-          // }
-          // if (from < 3) {
-          //   await m.createTable(someNewTable);
-          // }
-          //
-          // Her `if (from < N)` bloğu bağımsız çalışır — kullanıcılar
-          // sürümleri atlayarak güncelleyebilir.
-        },
-        beforeOpen: (details) async {
-          // WAL modu etkinleştir — cross-isolate güvenli yazma için gerekli.
-          // bkz. §7 (WAL/cross-isolate spike).
-          await customStatement('PRAGMA journal_mode=WAL;');
-          await customStatement('PRAGMA foreign_keys=ON;');
-        },
-      );
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      // v1 → v2 ve sonrası için örnek şablon:
+      //
+      // if (from < 2) {
+      //   await m.addColumn(uploadTasks, uploadTasks.someNewColumn);
+      // }
+      // if (from < 3) {
+      //   await m.createTable(someNewTable);
+      // }
+      //
+      // Her `if (from < N)` bloğu bağımsız çalışır — kullanıcılar
+      // sürümleri atlayarak güncelleyebilir.
+    },
+    beforeOpen: (details) async {
+      // WAL modu etkinleştir — cross-isolate güvenli yazma için gerekli.
+      // bkz. §7 (WAL/cross-isolate spike).
+      await customStatement('PRAGMA journal_mode=WAL;');
+      await customStatement('PRAGMA foreign_keys=ON;');
+    },
+  );
 }
 
 /// Varsayılan veritabanı bağlantısı: `getApplicationSupportDirectory()` altında.

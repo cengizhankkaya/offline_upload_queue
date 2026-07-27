@@ -113,16 +113,16 @@ class QueueSummary {
 
   @override
   int get hashCode => Object.hash(
-        pending,
-        uploading,
-        completed,
-        failed,
-        permanentlyFailed,
-        cancelled,
-        isPaused,
-        pausedDueToAuth,
-        estimatedDiskUsageBytes,
-      );
+    pending,
+    uploading,
+    completed,
+    failed,
+    permanentlyFailed,
+    cancelled,
+    isPaused,
+    pausedDueToAuth,
+    estimatedDiskUsageBytes,
+  );
 
   @override
   String toString() =>

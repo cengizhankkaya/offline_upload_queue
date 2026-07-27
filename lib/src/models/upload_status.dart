@@ -4,7 +4,7 @@
 /// kaydedilir. Mevcut değerlerin sırası kesinlikle değiştirilmemeli;
 /// yeni değerler yalnızca **sona** eklenmeli. Aksi hâlde var olan
 /// kayıtların anlamı kayar ve sessiz veri bozulması oluşur.
-/// 
+///
 /// Yükleme işlemleri için durum yönetimi ve hata sınıflandırması sağlar.
 library;
 

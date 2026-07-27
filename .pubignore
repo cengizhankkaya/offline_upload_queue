@@ -1,0 +1,6 @@
+# Pub.dev'e gönderilmeyecek dosyalar
+docs/
+.agents/
+MANUAL_TESTING.md
+.github/
+.env*

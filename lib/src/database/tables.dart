@@ -73,8 +73,8 @@ class UploadTasks extends Table {
 
   @override
   List<Set<Column>> get uniqueKeys => [
-        {sequenceNumber},
-      ];
+    {sequenceNumber},
+  ];
 }
 
 /// Worker kilidi için tek satırlık tablo.

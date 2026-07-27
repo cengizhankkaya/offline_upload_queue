@@ -19,13 +19,13 @@ class UploadResult {
   final String? remoteChecksum;
 
   const UploadResult.success({this.remoteChecksum})
-      : success = true,
-        failureType = null,
-        retryAfter = null;
+    : success = true,
+      failureType = null,
+      retryAfter = null;
 
   const UploadResult.failure(this.failureType, {this.retryAfter})
-      : success = false,
-        remoteChecksum = null;
+    : success = false,
+      remoteChecksum = null;
 }
 
 /// Paketin kendi adapter-agnostic iptal sinyali.

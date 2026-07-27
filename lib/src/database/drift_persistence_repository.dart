@@ -24,23 +24,30 @@ class DriftPersistenceRepository implements PersistenceRepository {
 
   // ── Init & Recovery ──────────────────────────────────────────────────────
 
+  /// Depolamayı başlatır: `uploading` durumundaki görevleri `pending`'e döndürür
+  /// (crash recovery).
   @override
   Future<void> init() async {
     await recoverStuckUploads();
   }
 
+  /// `uploading` durumundaki tüm görevleri `pending`'e alır ve
+  /// `nextRetryAt`'ı null yapar — backoff beklemeden hemen alınabilir olsunlar.
   @override
   Future<void> recoverStuckUploads() async {
-    await (_db.update(_db.uploadTasks)
-          ..where((t) => t.status.equalsValue(UploadStatus.uploading)))
-        .write(const UploadTasksCompanion(
-      status: Value(UploadStatus.pending),
-      nextRetryAt: Value(null),
-    ));
+    await (_db.update(
+      _db.uploadTasks,
+    )..where((t) => t.status.equalsValue(UploadStatus.uploading))).write(
+      const UploadTasksCompanion(
+        status: Value(UploadStatus.pending),
+        nextRetryAt: Value(null),
+      ),
+    );
   }
 
   // ── Enqueue ───────────────────────────────────────────────────────────────
 
+  /// Yeni bir görev oluşturur, DB'ye INSERT eder ve döndürür.
   @override
   Future<model.UploadTask> enqueue({
     required String taskId,
@@ -74,13 +81,16 @@ class DriftPersistenceRepository implements PersistenceRepository {
 
   // ── Query ─────────────────────────────────────────────────────────────────
 
+  /// `status = pending` VE `(nextRetryAt IS NULL OR nextRetryAt <= now)` koşuluna
+  /// uyan, `sequenceNumber ASC` sıralı ilk görevi döner. Yoksa `null` döner.
   @override
   Future<model.UploadTask?> getNextPending(DateTime now) async {
     final query = _db.select(_db.uploadTasks)
-      ..where((t) =>
-          t.status.equalsValue(UploadStatus.pending) &
-          (t.nextRetryAt.isNull() |
-              t.nextRetryAt.isSmallerOrEqualValue(now)))
+      ..where(
+        (t) =>
+            t.status.equalsValue(UploadStatus.pending) &
+            (t.nextRetryAt.isNull() | t.nextRetryAt.isSmallerOrEqualValue(now)),
+      )
       ..orderBy([(t) => OrderingTerm.asc(t.sequenceNumber)])
       ..limit(1);
     final row = await query.getSingleOrNull();
@@ -89,25 +99,31 @@ class DriftPersistenceRepository implements PersistenceRepository {
 
   // ── State transitions ─────────────────────────────────────────────────────
 
+  /// Görevi `uploading` durumuna geçirir.
   @override
   Future<void> markUploading(String taskId) async {
-    await (_db.update(_db.uploadTasks)
-          ..where((t) => t.taskId.equals(taskId)))
-        .write(const UploadTasksCompanion(
-      status: Value(UploadStatus.uploading),
-    ));
+    await (_db.update(
+      _db.uploadTasks,
+    )..where((t) => t.taskId.equals(taskId))).write(
+      const UploadTasksCompanion(status: Value(UploadStatus.uploading)),
+    );
   }
 
+  /// Görevi `completed` durumuna geçirir ve checksum kaydeder.
   @override
   Future<void> markCompleted(String taskId, {String? checksum}) async {
-    await (_db.update(_db.uploadTasks)
-          ..where((t) => t.taskId.equals(taskId)))
-        .write(UploadTasksCompanion(
-      status: const Value(UploadStatus.completed),
-      checksum: Value(checksum),
-    ));
+    await (_db.update(
+      _db.uploadTasks,
+    )..where((t) => t.taskId.equals(taskId))).write(
+      UploadTasksCompanion(
+        status: const Value(UploadStatus.completed),
+        checksum: Value(checksum),
+      ),
+    );
   }
 
+  /// Görevi `failed` durumuna geçirir, `retryCount`'ı bir artırır ve
+  /// bir sonraki deneme zamanını [nextRetryAt] olarak kaydeder.
   @override
   Future<void> markFailed(
     String taskId, {
@@ -117,73 +133,87 @@ class DriftPersistenceRepository implements PersistenceRepository {
   }) async {
     await _db.transaction(() async {
       // retryCount'u artır
-      final current = await (_db.select(_db.uploadTasks)
-            ..where((t) => t.taskId.equals(taskId)))
-          .getSingleOrNull();
+      final current = await (_db.select(
+        _db.uploadTasks,
+      )..where((t) => t.taskId.equals(taskId))).getSingleOrNull();
       if (current == null) return;
 
-      await (_db.update(_db.uploadTasks)
-            ..where((t) => t.taskId.equals(taskId)))
-          .write(UploadTasksCompanion(
-        status: const Value(UploadStatus.failed),
-        failureType: Value(failureType),
-        errorMessage: Value(errorMessage),
-        nextRetryAt: Value(nextRetryAt),
-        retryCount: Value(current.retryCount + 1),
-      ));
+      await (_db.update(
+        _db.uploadTasks,
+      )..where((t) => t.taskId.equals(taskId))).write(
+        UploadTasksCompanion(
+          status: const Value(UploadStatus.failed),
+          failureType: Value(failureType),
+          errorMessage: Value(errorMessage),
+          nextRetryAt: Value(nextRetryAt),
+          retryCount: Value(current.retryCount + 1),
+        ),
+      );
     });
   }
 
+  /// Görevi `permanentlyFailed` durumuna geçirir — otomatik retry yok.
   @override
   Future<void> markPermanentlyFailed(
     String taskId, {
     required FailureType failureType,
     String? errorMessage,
   }) async {
-    await (_db.update(_db.uploadTasks)
-          ..where((t) => t.taskId.equals(taskId)))
-        .write(UploadTasksCompanion(
-      status: const Value(UploadStatus.permanentlyFailed),
-      failureType: Value(failureType),
-      errorMessage: Value(errorMessage),
-    ));
+    await (_db.update(
+      _db.uploadTasks,
+    )..where((t) => t.taskId.equals(taskId))).write(
+      UploadTasksCompanion(
+        status: const Value(UploadStatus.permanentlyFailed),
+        failureType: Value(failureType),
+        errorMessage: Value(errorMessage),
+      ),
+    );
   }
 
+  /// Görevi `cancelled` durumuna geçirir ve `nextRetryAt`'ı null yapar.
   @override
   Future<void> markCancelled(String taskId) async {
     // nextRetryAt da null yapılır: §4 Kritik kural #5 — iptal edilen görev
     // backoff zaman damgası taşımamalı (DB tutarlılığı)
-    await (_db.update(_db.uploadTasks)
-          ..where((t) => t.taskId.equals(taskId)))
-        .write(const UploadTasksCompanion(
-      status: Value(UploadStatus.cancelled),
-      nextRetryAt: Value(null),
-    ));
+    await (_db.update(
+      _db.uploadTasks,
+    )..where((t) => t.taskId.equals(taskId))).write(
+      const UploadTasksCompanion(
+        status: Value(UploadStatus.cancelled),
+        nextRetryAt: Value(null),
+      ),
+    );
   }
 
+  /// Görevi `pending` durumuna döndürür; `retryCount`, `nextRetryAt`,
+  /// `failureType`, `errorMessage` ve `checksum` sıfırlanır.
   @override
   Future<void> markPending(String taskId) async {
-    await (_db.update(_db.uploadTasks)
-          ..where((t) => t.taskId.equals(taskId)))
-        .write(const UploadTasksCompanion(
-      status: Value(UploadStatus.pending),
-      retryCount: Value(0),
-      nextRetryAt: Value(null),
-      failureType: Value(null),
-      errorMessage: Value(null),
-      checksum: Value(null),
-    ));
+    await (_db.update(
+      _db.uploadTasks,
+    )..where((t) => t.taskId.equals(taskId))).write(
+      const UploadTasksCompanion(
+        status: Value(UploadStatus.pending),
+        retryCount: Value(0),
+        nextRetryAt: Value(null),
+        failureType: Value(null),
+        errorMessage: Value(null),
+        checksum: Value(null),
+      ),
+    );
   }
 
+  /// Görevin SHA-256 checksum değerini kaydeder (`uploading` sırasında
+  /// hesaplanarak çağrılır).
   @override
   Future<void> updateChecksum(String taskId, String checksum) async {
-    await (_db.update(_db.uploadTasks)
-          ..where((t) => t.taskId.equals(taskId)))
+    await (_db.update(_db.uploadTasks)..where((t) => t.taskId.equals(taskId)))
         .write(UploadTasksCompanion(checksum: Value(checksum)));
   }
 
   // ── Sequence Number ───────────────────────────────────────────────────────
 
+  /// `MAX(sequenceNumber) + 1` sorgusunu döner; tablo boşsa `1` döner.
   @override
   Future<int> getNextSequenceNumber() async {
     final result = await _db
@@ -197,8 +227,15 @@ class DriftPersistenceRepository implements PersistenceRepository {
 
   // ── Lock / Heartbeat ──────────────────────────────────────────────────────
 
+  /// Atomik koşullu UPDATE ile worker kilidi almayı dener.
+  ///
+  /// `staleLockThreshold`'dan eski bir kilit varsa devralır ve `true` döner;
+  /// aktif bir başka worker kilidi tutuyorsa `false` döner.
   @override
-  Future<bool> tryAcquireLock(String ownerId, Duration staleLockThreshold) async {
+  Future<bool> tryAcquireLock(
+    String ownerId,
+    Duration staleLockThreshold,
+  ) async {
     final staleThreshold = DateTime.now().subtract(staleLockThreshold);
     final now = DateTime.now();
 
@@ -229,7 +266,7 @@ class DriftPersistenceRepository implements PersistenceRepository {
     return updated == 1;
   }
 
-
+  /// Worker heartbeat zamanını günceller — kilidin stale sayılmasını engeller.
   @override
   Future<void> updateHeartbeat(String ownerId, DateTime acquiredAt) async {
     await _db.customUpdate(
@@ -242,16 +279,18 @@ class DriftPersistenceRepository implements PersistenceRepository {
     );
   }
 
+  /// Worker kilidini serbest bırakır (`dispose()` tarafından çağrılır).
   @override
   Future<void> releaseLock() async {
-    await (_db.delete(_db.activeWorkerLock)
-          ..where((t) => t.id.equals(0)))
-        .go();
+    await (_db.delete(_db.activeWorkerLock)..where((t) => t.id.equals(0))).go();
   }
-
 
   // ── Reactive Streams ──────────────────────────────────────────────────────
 
+  /// Kuyruğun anlık özetini yayınlayan reaktif stream.
+  ///
+  /// `UploadTasks` tablosundaki herhangi bir yazım sonrası otomatik
+  /// yeni bir [QueueSummary] yayınlar.
   @override
   Stream<QueueSummary> watchSummary({
     bool isPaused = false,
@@ -303,6 +342,10 @@ class DriftPersistenceRepository implements PersistenceRepository {
     });
   }
 
+  /// Filtrelenmiş görev listesini yayınlayan reaktif stream.
+  ///
+  /// [statuses] null ise tüm durumları döner. [limit]/[offset] ile
+  /// sayfalama desteklenir.
   @override
   Stream<List<model.UploadTask>> watchTasks({
     Set<UploadStatus>? statuses,
@@ -322,16 +365,16 @@ class DriftPersistenceRepository implements PersistenceRepository {
     return query.watch().map((rows) => rows.map(_rowToTask).toList());
   }
 
+  /// Tek bir görevin upload ilerleme oranını (0.0–1.0) yayınlayan stream.
   @override
   Stream<double> watchProgress(String taskId) {
     return _progressControllers
-        .putIfAbsent(
-          taskId,
-          () => StreamController<double>.broadcast(),
-        )
+        .putIfAbsent(taskId, () => StreamController<double>.broadcast())
         .stream;
   }
 
+  /// Upload ilerleme değerini stream'e yazar ([QueueController] tarafından
+  /// çağrılır).
   @override
   void updateProgress(String taskId, double ratio) {
     _progressControllers[taskId]?.add(ratio);
@@ -339,49 +382,55 @@ class DriftPersistenceRepository implements PersistenceRepository {
 
   // ── Purge ─────────────────────────────────────────────────────────────────
 
+  /// Görevi ve varsa sandbox kopyasını kalıcı olarak siler.
   @override
   Future<void> purge(String taskId) async {
-    final task = await (_db.select(_db.uploadTasks)
-          ..where((t) => t.taskId.equals(taskId)))
-        .getSingleOrNull();
+    final task = await (_db.select(
+      _db.uploadTasks,
+    )..where((t) => t.taskId.equals(taskId))).getSingleOrNull();
     if (task == null) return;
 
     await _deleteSandboxFile(task.filePath);
-    await (_db.delete(_db.uploadTasks)
-          ..where((t) => t.taskId.equals(taskId)))
-        .go();
+    await (_db.delete(
+      _db.uploadTasks,
+    )..where((t) => t.taskId.equals(taskId))).go();
   }
 
+  /// Tüm `permanentlyFailed` görevleri ve sandbox kopyalarını siler.
   @override
   Future<void> purgeAllFailed() async {
     await _purgeByStatus(UploadStatus.permanentlyFailed);
   }
 
+  /// Tüm `cancelled` görevleri ve sandbox kopyalarını siler.
   @override
   Future<void> purgeAllCancelled() async {
     await _purgeByStatus(UploadStatus.cancelled);
   }
 
+  /// Tüm `completed` görevlerin DB kayıtlarını siler.
+  ///
+  /// Sandbox kopyaları zaten `completed` anında silinmiştir.
   @override
   Future<void> purgeAllCompleted() async {
     // Completed görevlerin sandbox dosyaları zaten silinmiş — yalnızca DB kaydı
-    await (_db.delete(_db.uploadTasks)
-          ..where((t) => t.status.equalsValue(UploadStatus.completed)))
-        .go();
+    await (_db.delete(
+      _db.uploadTasks,
+    )..where((t) => t.status.equalsValue(UploadStatus.completed))).go();
   }
 
   Future<void> _purgeByStatus(UploadStatus status) async {
-    final rows = await (_db.select(_db.uploadTasks)
-          ..where((t) => t.status.equalsValue(status)))
-        .get();
+    final rows = await (_db.select(
+      _db.uploadTasks,
+    )..where((t) => t.status.equalsValue(status))).get();
 
     for (final row in rows) {
       await _deleteSandboxFile(row.filePath);
     }
 
-    await (_db.delete(_db.uploadTasks)
-          ..where((t) => t.status.equalsValue(status)))
-        .go();
+    await (_db.delete(
+      _db.uploadTasks,
+    )..where((t) => t.status.equalsValue(status))).go();
   }
 
   Future<void> _deleteSandboxFile(String filePath) async {
@@ -395,6 +444,8 @@ class DriftPersistenceRepository implements PersistenceRepository {
 
   // ── Dispose ───────────────────────────────────────────────────────────────
 
+  /// Progress stream controller'larını kapatır ve DB bağlantısını serbest
+  /// bırakır.
   @override
   Future<void> dispose() async {
     for (final c in _progressControllers.values) {

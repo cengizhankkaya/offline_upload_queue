@@ -97,12 +97,15 @@ class DefaultConnectivityMonitor implements ConnectivityMonitor {
     this.reachabilityUrl,
     Connectivity? connectivity,
     Dio? dio,
-  })  : _connectivity = connectivity ?? Connectivity(),
-        _dio = dio ??
-            Dio(BaseOptions(
-              connectTimeout: _reachabilityTimeout,
-              receiveTimeout: _reachabilityTimeout,
-            )) {
+  }) : _connectivity = connectivity ?? Connectivity(),
+       _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               connectTimeout: _reachabilityTimeout,
+               receiveTimeout: _reachabilityTimeout,
+             ),
+           ) {
     _controller = StreamController<ConnectivityStatus>.broadcast(
       onListen: _startListening,
       onCancel: _stopListening,
@@ -128,7 +131,8 @@ class DefaultConnectivityMonitor implements ConnectivityMonitor {
   /// `connectivity_plus` sonucunu [ConnectivityStatus]'e çevirir.
   /// Bağlı görünüyorsa reachability testi yapar.
   Future<ConnectivityStatus> _resolveStatus(
-      List<ConnectivityResult> results) async {
+    List<ConnectivityResult> results,
+  ) async {
     // En öncelikli bağlantı tipini al (wifi > mobile > others)
     final raw = _bestResult(results);
     if (raw == ConnectivityResult.none) return ConnectivityStatus.none;

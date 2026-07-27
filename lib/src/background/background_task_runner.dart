@@ -55,10 +55,7 @@ class BackgroundTaskRunner {
         }
       });
 
-      await Future.any([
-        emptyCompleter.future,
-        Future<void>.delayed(timeout),
-      ]);
+      await Future.any([emptyCompleter.future, Future<void>.delayed(timeout)]);
 
       await sub.cancel();
     } catch (e) {

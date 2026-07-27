@@ -16,7 +16,7 @@ Built on **SQLite/Drift** for durability, **Dio** for networking, and **BGTaskSc
 <!-- Replace with an animated GIF captured from the example app:
      flutter run example/ → record with Xcode/Android Studio → convert with ffmpeg
      Suggested: 600px wide, 15fps, ~4s loop showing enqueue → uploading → completed -->
-<!-- ![Queue demo](docs/screenshots/demo_queue.gif) -->
+<!-- ![Queue demo](doc/screenshots/demo_queue.gif) -->
 
 ---
 
@@ -220,7 +220,7 @@ void main() async {
 
 ## Task State Machine
 
-![UploadStatus state machine](docs/screenshots/state_machine.png)
+![UploadStatus state machine](doc/screenshots/state_machine.png)
 
 | State | Meaning |
 |---|---|

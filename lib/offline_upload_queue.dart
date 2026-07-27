@@ -22,7 +22,8 @@ export 'src/background/background_task_runner.dart';
 
 // ── Kuyruk (public API) ───────────────────────────────────────────────────────
 export 'src/queue/upload_queue.dart';
-export 'src/queue/upload_queue_options.dart' show UploadQueueAdvancedOptions, LogLevel;
+export 'src/queue/upload_queue_options.dart'
+    show UploadQueueAdvancedOptions, LogLevel;
 export 'src/queue/retry_policy.dart' show BackoffStrategy, RetryPolicy;
 
 // ── Veritabanı (isteğe bağlı — ileri düzey kullanım için) ────────────────────

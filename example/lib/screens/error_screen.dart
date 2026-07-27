@@ -26,7 +26,8 @@ class ErrorScreen extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              'Var olmayan dosya eklendi — kısa süre içinde permanentlyFailed olacak'),
+            'Var olmayan dosya eklendi — kısa süre içinde permanentlyFailed olacak',
+          ),
         ),
       );
     }
@@ -38,9 +39,9 @@ class ErrorScreen extends StatelessWidget {
     if (file == null) return;
     await uploadQueue.enqueue(filePath: file.path);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gerçek dosya eklendi')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Gerçek dosya eklendi')));
     }
   }
 
@@ -95,17 +96,21 @@ class ErrorScreen extends StatelessWidget {
             child: SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                icon: const Icon(Icons.delete_sweep_outlined,
-                    color: Colors.redAccent),
-                label: const Text('Tüm Kalıcı Hataları Sil (purgeAllFailed)',
-                    style: TextStyle(color: Colors.redAccent)),
+                icon: const Icon(
+                  Icons.delete_sweep_outlined,
+                  color: Colors.redAccent,
+                ),
+                label: const Text(
+                  'Tüm Kalıcı Hataları Sil (purgeAllFailed)',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
                 onPressed: () async {
                   await uploadQueue.purgeAllFailed();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                          content:
-                              Text('Tüm permanentlyFailed görevler silindi')),
+                        content: Text('Tüm permanentlyFailed görevler silindi'),
+                      ),
                     );
                   }
                 },
@@ -117,8 +122,10 @@ class ErrorScreen extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Başarısız / İptal Edilmiş Görevler',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(
+                'Başarısız / İptal Edilmiş Görevler',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
           Expanded(
@@ -135,8 +142,7 @@ class ErrorScreen extends StatelessWidget {
                 final tasks = snap.data ?? [];
                 if (tasks.isEmpty) {
                   return const Center(
-                    child: Text('Hata yok 🎉',
-                        style: TextStyle(fontSize: 16)),
+                    child: Text('Hata yok 🎉', style: TextStyle(fontSize: 16)),
                   );
                 }
                 return ListView.builder(
@@ -169,15 +175,13 @@ class ErrorScreen extends StatelessWidget {
                             IconButton(
                               icon: const Icon(Icons.refresh),
                               tooltip: 'retry()',
-                              onPressed: () =>
-                                  uploadQueue.retry(t.taskId),
+                              onPressed: () => uploadQueue.retry(t.taskId),
                             ),
                             // purge() → sil
                             IconButton(
                               icon: const Icon(Icons.delete_outline),
                               tooltip: 'purge()',
-                              onPressed: () =>
-                                  uploadQueue.purge(t.taskId),
+                              onPressed: () => uploadQueue.purge(t.taskId),
                             ),
                           ],
                         ),

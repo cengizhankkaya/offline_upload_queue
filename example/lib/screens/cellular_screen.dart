@@ -56,9 +56,7 @@ class _CellularScreenState extends State<CellularScreen> {
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kuyruğa eklendi (Wi-Fi bekleniyor)'),
-        ),
+        const SnackBar(content: Text('Kuyruğa eklendi (Wi-Fi bekleniyor)')),
       );
     }
   }
@@ -70,7 +68,8 @@ class _CellularScreenState extends State<CellularScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('forceUploadOnce() çağrıldı — cellular\'da çalışır')),
+          content: Text('forceUploadOnce() çağrıldı — cellular\'da çalışır'),
+        ),
       );
     }
   }
@@ -105,7 +104,13 @@ class _CellularScreenState extends State<CellularScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('wifiOnly: true', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(
+                      'wifiOnly: true',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                     SizedBox(height: 8),
                     Text(
                       'Bu sekmedeki kuyruk yalnızca Wi-Fi bağlantısında '
@@ -126,10 +131,14 @@ class _CellularScreenState extends State<CellularScreen> {
                 final s = snap.data;
                 if (s == null) return const SizedBox.shrink();
                 return Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 16,
+                  ),
                   decoration: BoxDecoration(
                     border: Border.all(
-                        color: theme.colorScheme.outline.withValues(alpha: 0.4)),
+                      color: theme.colorScheme.outline.withValues(alpha: 0.4),
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -189,9 +198,10 @@ class _Info extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value,
-            style: const TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 2),
         Text(label, style: const TextStyle(fontSize: 11)),
       ],

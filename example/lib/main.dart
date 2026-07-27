@@ -68,7 +68,7 @@ final uploadQueue = UploadQueue(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  Workmanager().initialize(callbackDispatcher, isInDebugMode: true);
+  Workmanager().initialize(callbackDispatcher);
 
   await uploadQueue.init();
 

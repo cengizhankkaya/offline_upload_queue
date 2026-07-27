@@ -19,7 +19,7 @@ dependencies:
   offline_upload_queue:
     path: ../
   image_picker: ^1.1.2
-  workmanager: ^0.5.2
+  workmanager: ^0.9.0+3
 
 dev_dependencies:
   flutter_test:

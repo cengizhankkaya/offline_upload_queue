@@ -104,8 +104,7 @@ class UploadTask {
           nextRetryAt == other.nextRetryAt;
 
   @override
-  int get hashCode =>
-      taskId.hashCode ^ status.hashCode ^ retryCount.hashCode;
+  int get hashCode => taskId.hashCode ^ status.hashCode ^ retryCount.hashCode;
 
   @override
   String toString() =>
