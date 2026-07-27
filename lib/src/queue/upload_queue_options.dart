@@ -60,6 +60,17 @@ class UploadQueueAdvancedOptions {
   /// veya otomatik silmez (bkz. Bölüm 4, \"tam backpressure değil\").
   final int? diskUsageWarningBytes;
 
+  /// Dosya kopyalama işlemi için fallback eşiği.
+  /// `copyToSandbox` etkin olduğunda, bu boyuttan daha büyük dosyalar
+  /// belleği tüketmemek için streaming ile kopyalanır ve öncelikle
+  /// hardlink (ln) kullanılmaya çalışılır.
+  /// `null` ise varsayılan olarak her dosya boyutu için streaming+hardlink denenir
+  /// (yeni önerilen davranış budur, ancak null değeri tüm dosyalar için bunu
+  /// aktifleştireceği için bir boyut tanımlamak performanslı olabilir).
+  ///
+  /// Örnek: `50 * 1024 * 1024` (50MB).
+  final int? sandboxCopyThresholdBytes;
+
   /// Disk kullanımı [diskUsageWarningBytes] eşiğini her aşışında çağrılır.
   ///
   /// [currentBytes]: anlık toplam kullanım.
@@ -102,6 +113,7 @@ class UploadQueueAdvancedOptions {
     this.staleLockThreshold = const Duration(minutes: 5),
     this.heartbeatInterval = const Duration(seconds: 30),
     this.diskUsageWarningBytes,
+    this.sandboxCopyThresholdBytes,
     this.onDiskUsageWarning,
     this.onLog,
   });

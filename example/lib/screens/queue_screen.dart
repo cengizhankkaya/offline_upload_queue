@@ -19,12 +19,16 @@ class QueueScreen extends StatelessWidget {
     final picker = ImagePicker();
     final files = await picker.pickMultiImage();
     if (files.isEmpty) return;
-    final items = files.map((f) => (
-      filePath: f.path,
-      metadata: <String, dynamic>{'source': 'gallery', 'name': f.name},
-      priority: 0,
-    )).toList();
-    
+    final items = files
+        .map(
+          (f) => (
+            filePath: f.path,
+            metadata: <String, dynamic>{'source': 'gallery', 'name': f.name},
+            priority: 0,
+          ),
+        )
+        .toList();
+
     await uploadQueue.enqueueBatch(items);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -97,7 +101,10 @@ class QueueScreen extends StatelessWidget {
                 return const SizedBox.shrink();
               }
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 4.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

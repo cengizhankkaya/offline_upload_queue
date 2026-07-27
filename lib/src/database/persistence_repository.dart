@@ -99,6 +99,10 @@ abstract class PersistenceRepository {
   /// iki worker aynı anda `true` alamaz (bkz. §7).
   Future<bool> tryAcquireLock(String ownerId, Duration staleLockThreshold);
 
+  /// Worker kilidi tablosundaki değişiklikleri yayınlayan stream.
+  /// Kilit devralma sırasındaki polling'i azaltmak için kullanılır.
+  Stream<void> watchLockUpdates();
+
   /// Worker kilidini serbest bırakır.
   Future<void> releaseLock();
 

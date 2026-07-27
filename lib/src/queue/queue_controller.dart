@@ -173,7 +173,8 @@ class QueueController {
   /// Kilidi alana kadar heartbeat aralığında bekleyerek dener.
   ///
   /// Aktif bir worker varsa, o worker ya kapanır ya da staleLockThreshold
-  /// dolunca stale sayılır ve bu worker kilidi devralır.
+  /// dolunca stale sayılır ve bu worker kilidi devralır. Event tabanlı
+  /// kilit devralma ile, aktif worker kilit serbest bıraktığı an dinlenir.
   Future<void> _acquireLockWithRetry() async {
     // İlk deneme
     _lockAcquired = await _repo.tryAcquireLock(
@@ -189,19 +190,67 @@ class QueueController {
       level: LogLevel.warning,
     );
 
-    // Kilit stale olana kadar heartbeat aralığında tekrar dene
-    while (!_lockAcquired && !_disposed) {
-      await Future<void>.delayed(_advanced.heartbeatInterval);
-      if (_disposed) return;
-      _lockAcquired = await _repo.tryAcquireLock(
-        _workerId,
-        _advanced.staleLockThreshold,
-      );
+    Completer<void>? lockReleaseCompleter;
+    final lockSub = _repo.watchLockUpdates().listen((_) {
+      final completer = lockReleaseCompleter;
+      if (completer != null && !completer.isCompleted) {
+        completer.complete();
+      }
+    });
+
+    try {
+      while (!_lockAcquired && !_disposed) {
+        if (_backgroundDeadline != null) {
+          final remaining = _backgroundDeadline!.difference(DateTime.now());
+          if (remaining < const Duration(seconds: 5)) {
+            _log(
+              'Arka plan penceresi kilit almadan doldu.',
+              level: LogLevel.warning,
+            );
+            break;
+          }
+        }
+
+        final pollInterval = _backgroundDeadline != null
+            ? _adaptivePollInterval(_backgroundDeadline!)
+            : _advanced.heartbeatInterval;
+
+        lockReleaseCompleter = Completer<void>();
+        try {
+          await lockReleaseCompleter.future.timeout(pollInterval);
+        } catch (_) {
+          // Timeout (normal polling döngüsü doldu)
+        }
+        lockReleaseCompleter = null;
+
+        if (_disposed) return;
+
+        _lockAcquired = await _repo.tryAcquireLock(
+          _workerId,
+          _advanced.staleLockThreshold,
+        );
+      }
+    } finally {
+      await lockSub.cancel();
     }
 
     if (_lockAcquired) {
       _log('Worker kilidi devralındı.', level: LogLevel.warning);
     }
+  }
+
+  Duration _adaptivePollInterval(DateTime deadline) {
+    final remaining = deadline.difference(DateTime.now());
+    if (remaining.isNegative) return const Duration(seconds: 1);
+    final interval =
+        remaining ~/ 5; // deadline'ın beşte biri kadar aralıklarla kontrol et
+    if (interval < const Duration(seconds: 1)) {
+      return const Duration(seconds: 1);
+    }
+    if (interval > _advanced.heartbeatInterval) {
+      return _advanced.heartbeatInterval;
+    }
+    return interval;
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -259,7 +308,10 @@ class QueueController {
         final checksum = await _computeChecksum(actualPath);
         await _repo.updateChecksum(taskId, checksum);
       } catch (e) {
-        _log('enqueue() sırasında checksum hesaplanamadı: $e', level: LogLevel.warning);
+        _log(
+          'enqueue() sırasında checksum hesaplanamadı: $e',
+          level: LogLevel.warning,
+        );
       }
     }
 
@@ -269,16 +321,19 @@ class QueueController {
 
   /// Toplu olarak görev ekler.
   Future<List<String>> enqueueBatch(
-    List<({String filePath, Map<String, dynamic>? metadata, int priority})> items,
+    List<({String filePath, Map<String, dynamic>? metadata, int priority})>
+    items,
   ) async {
     _assertDisposed();
     final ids = <String>[];
     for (final item in items) {
-      ids.add(await enqueue(
-        filePath: item.filePath,
-        metadata: item.metadata,
-        priority: item.priority,
-      ));
+      ids.add(
+        await enqueue(
+          filePath: item.filePath,
+          metadata: item.metadata,
+          priority: item.priority,
+        ),
+      );
     }
     return ids;
   }
@@ -357,10 +412,10 @@ class QueueController {
     return _repo
         .watchSummary(isPaused: _paused, pausedDueToAuth: _pausedDueToAuth)
         .map((s) {
-      final total = s.pending + s.uploading + s.failed + s.completed;
-      if (total == 0) return 0.0;
-      return s.completed / total;
-    });
+          final total = s.pending + s.uploading + s.failed + s.completed;
+          if (total == 0) return 0.0;
+          return s.completed / total;
+        });
   }
 
   /// Tek bir görevi ve sandbox kopyasını kalıcı olarak siler.
@@ -701,12 +756,45 @@ class QueueController {
   }
 
   Future<String> _copyToSandboxDir(String sourcePath, String taskId) async {
-    // Basit byte-kopyalama (v1.0 — hardlink v2 adayı)
     final source = File(sourcePath);
-    final ext = sourcePath.contains('.') ? '.${sourcePath.split('.').last}' : '';
+    final ext = sourcePath.contains('.')
+        ? '.${sourcePath.split('.').last}'
+        : '';
     final destDir = await _getSandboxDir();
     final destPath = '${destDir.path}/$taskId$ext';
-    await source.copy(destPath);
+
+    // 1. Hardlink denemesi (Aynı volume üzerinde anlık ve sıfır disk kullanımı)
+    try {
+      if (!Platform.isWindows) {
+        // Windows'ta `ln` çalışmaz.
+        final result = await Process.run('ln', [sourcePath, destPath]);
+        if (result.exitCode == 0 && await File(destPath).exists()) {
+          return destPath;
+        }
+      }
+    } catch (_) {
+      // Hardlink desteklenmiyor veya farklı volume -> fallback
+    }
+
+    // 2. Boyut kontrolü ve kopyalama stratejisi
+    int? sizeBytes;
+    try {
+      sizeBytes = (await source.stat()).size;
+    } catch (_) {}
+
+    final threshold = _advanced.sandboxCopyThresholdBytes;
+    final shouldUseStreaming =
+        threshold != null && sizeBytes != null && sizeBytes > threshold;
+
+    if (shouldUseStreaming) {
+      // Büyük dosyalar için UI thread'i bloklamayan streaming copy
+      final sink = File(destPath).openWrite();
+      await source.openRead().pipe(sink);
+    } else {
+      // Küçük dosyalar için (veya fallback olarak) standart kopyalama
+      await source.copy(destPath);
+    }
+
     return destPath;
   }
 

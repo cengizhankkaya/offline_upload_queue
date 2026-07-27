@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 
+import '../models/metadata_codec.dart';
 import '../models/queue_summary.dart';
 import '../models/upload_status.dart';
 import '../models/upload_task.dart' as model;
@@ -16,11 +17,13 @@ import 'persistence_repository.dart';
 /// Birim testler için [InMemoryPersistenceRepository] kullanın.
 class DriftPersistenceRepository implements PersistenceRepository {
   final QueueDatabase _db;
+  final MetadataCodec? _metadataCodec;
 
   /// Progress stream'leri: taskId → controller
   final _progressControllers = <String, StreamController<double>>{};
 
-  DriftPersistenceRepository(this._db);
+  DriftPersistenceRepository(this._db, {MetadataCodec? metadataCodec})
+    : _metadataCodec = metadataCodec;
 
   // ── Init & Recovery ──────────────────────────────────────────────────────
 
@@ -66,7 +69,12 @@ class DriftPersistenceRepository implements PersistenceRepository {
       createdAt: now,
       priority: Value(priority),
       fileSizeBytes: Value(fileSizeBytes),
-      metadataJson: Value(metadata != null ? jsonEncode(metadata) : null),
+      metadataJson: Value(
+        metadata != null
+            ? (_metadataCodec?.encode(jsonEncode(metadata)) ??
+                  jsonEncode(metadata))
+            : null,
+      ),
     );
     await _db.into(_db.uploadTasks).insert(companion);
     return model.UploadTask(
@@ -291,6 +299,12 @@ class DriftPersistenceRepository implements PersistenceRepository {
     await (_db.delete(_db.activeWorkerLock)..where((t) => t.id.equals(0))).go();
   }
 
+  /// Worker kilidi tablosundaki değişiklikleri yayınlayan stream.
+  @override
+  Stream<void> watchLockUpdates() {
+    return _db.tableUpdates(TableUpdateQuery.onTable(_db.activeWorkerLock));
+  }
+
   // ── Reactive Streams ──────────────────────────────────────────────────────
 
   /// Kuyruğun anlık özetini yayınlayan reaktif stream.
@@ -433,7 +447,7 @@ class DriftPersistenceRepository implements PersistenceRepository {
     await purgeAllFailed();
     await purgeAllCancelled();
     await purgeAllCompleted();
-    
+
     if (includePending) {
       await _purgeByStatus(UploadStatus.pending);
     }
@@ -480,7 +494,9 @@ class DriftPersistenceRepository implements PersistenceRepository {
   model.UploadTask _rowToTask(UploadTaskData row) {
     Map<String, dynamic>? metadata;
     if (row.metadataJson != null) {
-      metadata = jsonDecode(row.metadataJson!) as Map<String, dynamic>;
+      final plainJson =
+          _metadataCodec?.decode(row.metadataJson!) ?? row.metadataJson!;
+      metadata = jsonDecode(plainJson) as Map<String, dynamic>;
     }
     return model.UploadTask(
       taskId: row.taskId,

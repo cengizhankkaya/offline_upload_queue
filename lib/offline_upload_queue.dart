@@ -9,6 +9,7 @@ library;
 export 'src/models/upload_status.dart';
 export 'src/models/upload_task.dart';
 export 'src/models/queue_summary.dart';
+export 'src/models/metadata_codec.dart';
 
 // ── Ağ katmanı ────────────────────────────────────────────────────────────────
 export 'src/network/upload_adapter.dart';

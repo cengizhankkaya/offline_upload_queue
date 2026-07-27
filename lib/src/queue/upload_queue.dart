@@ -1,5 +1,6 @@
 import '../database/database.dart';
 import '../database/drift_persistence_repository.dart';
+import '../models/metadata_codec.dart';
 import '../models/queue_summary.dart';
 import '../models/upload_status.dart';
 import '../models/upload_task.dart';
@@ -111,6 +112,13 @@ class UploadQueue {
   /// Çoğu kullanıcının bu parametreye dokunmasına gerek yoktur.
   final UploadQueueAdvancedOptions advanced;
 
+  /// Veritabanı dosyasının (SQLCipher) tamamen şifrelenmesi için anahtar.
+  /// (Opsiyonel offline_upload_queue_sqlcipher paketini kullanmayı gerektirebilir).
+  final String? encryptionKey;
+
+  /// Yalnızca metadata alanındaki JSON verisini şifrelemek için codec (SQLCipher kullanılmıyorsa).
+  final MetadataCodec? metadataCodec;
+
   UploadQueue({
     required this.adapter,
     this.maxAttempts = 6,
@@ -124,6 +132,8 @@ class UploadQueue {
     this.onAuthExpired,
     this.authTimeout = const Duration(seconds: 30),
     this.advanced = const UploadQueueAdvancedOptions(),
+    this.encryptionKey,
+    this.metadataCodec,
   });
 
   // ── Init ──────────────────────────────────────────────────────────────────
@@ -150,8 +160,8 @@ class UploadQueue {
 
     final effectiveMonitor =
         connectivityMonitor ?? DefaultConnectivityMonitor();
-    final db = QueueDatabase();
-    final repo = DriftPersistenceRepository(db);
+    final db = QueueDatabase(encryptionKey: encryptionKey);
+    final repo = DriftPersistenceRepository(db, metadataCodec: metadataCodec);
 
     _controller = QueueController(
       repository: repo,
@@ -189,7 +199,7 @@ class UploadQueue {
   }) {
     _assertInitialized();
     return _controller.enqueue(
-      filePath: filePath, 
+      filePath: filePath,
       metadata: metadata,
       priority: priority,
     );
@@ -197,7 +207,8 @@ class UploadQueue {
 
   /// Birden fazla dosyayı tek seferde kuyruğa ekler ve taskId listesi döner.
   Future<List<String>> enqueueBatch(
-    List<({String filePath, Map<String, dynamic>? metadata, int priority})> items,
+    List<({String filePath, Map<String, dynamic>? metadata, int priority})>
+    items,
   ) {
     _assertInitialized();
     return _controller.enqueueBatch(items);

@@ -212,6 +212,9 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   Future<void> releaseLock() async {}
 
   @override
+  Stream<void> watchLockUpdates() => const Stream.empty();
+
+  @override
   Future<void> recoverStuckUploads() => init();
 
   @override

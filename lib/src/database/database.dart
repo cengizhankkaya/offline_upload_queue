@@ -25,14 +25,16 @@ part 'database.g.dart';
 ///   güncelleyebilir (v1 → v3 doğrudan).
 @DriftDatabase(tables: [UploadTasks, ActiveWorkerLock])
 class QueueDatabase extends _$QueueDatabase {
-  QueueDatabase([QueryExecutor? executor])
-    : super(executor ?? _openConnection());
+  final String? encryptionKey;
+
+  QueueDatabase({QueryExecutor? executor, this.encryptionKey})
+    : super(executor ?? _openConnection(encryptionKey));
 
   /// Birim testlerde in-memory veritabanı kullanmak için:
   /// ```dart
   /// final db = QueueDatabase.forTesting(NativeDatabase.memory());
   /// ```
-  QueueDatabase.forTesting(super.executor);
+  QueueDatabase.forTesting(super.executor, {this.encryptionKey});
 
   @override
   int get schemaVersion => 2;
@@ -55,10 +57,17 @@ class QueueDatabase extends _$QueueDatabase {
 }
 
 /// Varsayılan veritabanı bağlantısı: `getApplicationSupportDirectory()` altında.
-LazyDatabase _openConnection() {
+LazyDatabase _openConnection(String? encryptionKey) {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationSupportDirectory();
     final file = File(p.join(dbFolder.path, 'offline_upload_queue.db'));
-    return NativeDatabase.createInBackground(file);
+    return NativeDatabase.createInBackground(
+      file,
+      setup: (db) {
+        if (encryptionKey != null) {
+          db.execute("PRAGMA key = '$encryptionKey';");
+        }
+      },
+    );
   });
 }
