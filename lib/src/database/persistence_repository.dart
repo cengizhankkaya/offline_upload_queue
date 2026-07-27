@@ -88,6 +88,16 @@ abstract class PersistenceRepository {
   /// [ownerId]: worker/isolate kimliği (debug amaçlı).
   Future<void> updateHeartbeat(String ownerId, DateTime acquiredAt);
 
+  /// Atomik koşullu UPDATE ile worker kilidini almayı dener.
+  ///
+  /// Kilit yoksa veya stale ise ([staleLockThreshold]'dan eski `acquiredAt`)
+  /// kilidi [ownerId]'ye aktarır ve `true` döner.
+  /// Başka bir worker kilidi tazeliyorsa `false` döner.
+  ///
+  /// SQLite'ın tek yazar garantisi sayesinde bu işlem atomiktir —
+  /// iki worker aynı anda `true` alamaz (bkz. §7).
+  Future<bool> tryAcquireLock(String ownerId, Duration staleLockThreshold);
+
   /// Worker kilidini serbest bırakır.
   Future<void> releaseLock();
 

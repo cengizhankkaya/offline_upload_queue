@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -42,10 +43,15 @@ class QueueController {
   final Duration _authTimeout;
   final UploadQueueAdvancedOptions _advanced;
 
+  // ── Singleton guard: aynı isolate içinde aynı boxName iki kez init() edilemez
+  // (farklı isolate'ler arası çakışma DB kilit mekanizmasıyla çözülür — bkz. §7)
+  static final _activeBoxNames = <String>{};
+
   // ── Worker state ──────────────────────────────────────────────────────────
   bool _paused = false;
   bool _pausedDueToAuth = false;
   bool _disposed = false;
+  bool _lockAcquired = false;
   final _activeTokens = <String, UploadCancelToken>{};
 
   // forceUploadOnce snapshot: bu taskId'ler wifiOnly bypass ile işlenebilir
@@ -91,9 +97,18 @@ class QueueController {
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
-  /// Başlatır: argüman doğrulaması, crash recovery, bağlantı izleme, worker döngüsü.
+  /// Başlatır: argüman doğrulaması, crash recovery, kilit alma, bağlantı izleme, worker döngüsü.
   Future<void> init() async {
     _assertDisposed();
+
+    // ── Singleton guard: aynı isolate içinde aynı boxName'i iki kez init() edilemez
+    if (_activeBoxNames.contains(_boxName)) {
+      throw StateError(
+        'UploadQueue with boxName "$_boxName" is already initialized in this '
+        'isolate. Reuse the existing instance instead of calling init() twice. '
+        'Call dispose() first if you want to reinitialize.',
+      );
+    }
 
     // Argüman doğrulaması (bkz. plan Bölüm 8)
     if (_retryPolicy.maxAttempts < 1) {
@@ -112,9 +127,25 @@ class QueueController {
         'heartbeatInterval * 3 (${_advanced.heartbeatInterval * 3}) olmalı',
       );
     }
+    // Aşırı büyük staleLockThreshold uyarısı (bkz. §7 — sert hata değil, log)
+    if (_advanced.staleLockThreshold > const Duration(minutes: 30)) {
+      _log(
+        'staleLockThreshold ${_advanced.staleLockThreshold} gibi yüksek bir '
+        'değere ayarlandı; çökmüş bir worker kilidi bu süre boyunca devralınamaz.',
+        level: LogLevel.warning,
+      );
+    }
 
-    // Crash recovery
+    // Crash recovery: uploading → pending + kilit temizliği (bkz. §4 Kritik kural #3)
     await _repo.init();
+
+    // ── Kilit alma (bkz. §7 — atomik koşullu UPDATE)
+    // staleLockThreshold kadar yeni heartbeat'e sahip bir lock varsa geri çekil
+    // ve heartbeat aralığıyla periyodik olarak tekrar dene.
+    await _acquireLockWithRetry();
+
+    // Başarıyla init edildi — boxName'i sete ekle
+    _activeBoxNames.add(_boxName);
 
     // İlk bağlantı durumunu al
     _lastStatus = await _connectivityMonitor.checkStatus();
@@ -133,6 +164,40 @@ class QueueController {
 
     // İlk çalışmayı tetikle
     _triggerWorker();
+  }
+
+  /// Kilidi alana kadar heartbeat aralığında bekleyerek dener.
+  ///
+  /// Aktif bir worker varsa, o worker ya kapanır ya da staleLockThreshold
+  /// dolunca stale sayılır ve bu worker kilidi devralır.
+  Future<void> _acquireLockWithRetry() async {
+    // İlk deneme
+    _lockAcquired = await _repo.tryAcquireLock(
+      _workerId,
+      _advanced.staleLockThreshold,
+    );
+
+    if (_lockAcquired) return;
+
+    _log(
+      'Worker kilidi başka bir instance tarafından tutuluyor. '
+      'staleLockThreshold (${_advanced.staleLockThreshold}) dolana kadar bekleniyor...',
+      level: LogLevel.warning,
+    );
+
+    // Kilit stale olana kadar heartbeat aralığında tekrar dene
+    while (!_lockAcquired && !_disposed) {
+      await Future<void>.delayed(_advanced.heartbeatInterval);
+      if (_disposed) return;
+      _lockAcquired = await _repo.tryAcquireLock(
+        _workerId,
+        _advanced.staleLockThreshold,
+      );
+    }
+
+    if (_lockAcquired) {
+      _log('Worker kilidi devralındı.', level: LogLevel.warning);
+    }
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -491,6 +556,12 @@ class QueueController {
   void _startHeartbeat() {
     _heartbeatTimer = Timer.periodic(_advanced.heartbeatInterval, (_) async {
       if (_disposed) return;
+
+      // Yalnızca kilidin sahibi olan worker heartbeat gönderir (bkz. §7)
+      // _lockAcquired false ise _acquireLockWithRetry hâlâ bekliyor demektir;
+      // o döngü kendi sıklığıyla denemeye devam eder, burada tekrar denemeyiz.
+      if (!_lockAcquired) return;
+
       await _repo.updateHeartbeat(_workerId, DateTime.now());
 
       // Disk kullanım uyarısı
@@ -507,11 +578,13 @@ class QueueController {
     });
   }
 
+
   // ── Dispose ───────────────────────────────────────────────────────────────
 
   /// Kaynakları serbest bırakır.
   ///
-  /// Aktif upload varsa token'ı iptal eder, görevi pending'e döndürür.
+  /// Aktif upload varsa token'ı iptal eder, görevi `pending`'e döndürür
+  /// (`cancelled`'a değil — bkz. §8 "dispose() sırasında aktif worker").
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
@@ -522,7 +595,9 @@ class QueueController {
     // Bağlantı izlemeyi durdur
     await _connectivitySub?.cancel();
 
-    // Aktif upload'ları iptal et ve pending'e döndür
+    // Aktif upload'ları iptal et ve pending'e döndür (cancelled değil!)
+    // bkz. §8 — dispose() görevi cancelled'a almaz, sonraki init()'te
+    // backoff beklemeden tekrar alınabilir olsun diye pending'e döner.
     for (final entry in _activeTokens.entries) {
       entry.value.cancel();
       try {
@@ -534,8 +609,14 @@ class QueueController {
     // Worker trigger stream'ini kapat
     await _triggerController.close();
 
-    // Lock serbest bırak
-    await _repo.releaseLock();
+    // Kilidin sahibi bu worker ise serbest bırak
+    // (stale bekleme sırasında _lockAcquired false olabilir)
+    if (_lockAcquired) {
+      await _repo.releaseLock();
+    }
+
+    // boxName'i singleton set'ten çıkar — aynı boxName tekrar init() edilebilsin
+    _activeBoxNames.remove(_boxName);
 
     // Repo'yu kapat
     await _repo.dispose();
@@ -583,5 +664,17 @@ class QueueController {
     if (_disposed) {
       throw StateError('QueueController.dispose() çağrıldıktan sonra kullanılamaz');
     }
+  }
+
+  /// **Yalnızca test ortamında kullanın.**
+  ///
+  /// `_activeBoxNames` setinden [boxName]'i zorla çıkarır. Bu, `dispose()`
+  /// çağrısını unuttuğunuz test senaryolarında aynı `boxName` ile yeni bir
+  /// `init()` yapabilmenizi sağlar (bkz. §10, madde 8 — hot-restart senaryosu).
+  ///
+  /// Production kodunda **asla çağrılmamalı** — yalnızca `test/helpers/` altında.
+  @visibleForTesting
+  static void resetForTesting(String boxName) {
+    _activeBoxNames.remove(boxName);
   }
 }

@@ -183,6 +183,13 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   Future<void> updateHeartbeat(String ownerId, DateTime acquiredAt) async {}
 
   @override
+  Future<bool> tryAcquireLock(String ownerId, Duration staleLockThreshold) async {
+    // Test ortamında tek worker varsayımı — her zaman kilidi alabilir.
+    // Kilit yarışı testi için ayrı bir fixture kullanın (bkz. §10 test #10).
+    return true;
+  }
+
+  @override
   Future<void> releaseLock() async {}
 
   @override

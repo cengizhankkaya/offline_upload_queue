@@ -198,14 +198,48 @@ class DriftPersistenceRepository implements PersistenceRepository {
   // ── Lock / Heartbeat ──────────────────────────────────────────────────────
 
   @override
+  Future<bool> tryAcquireLock(String ownerId, Duration staleLockThreshold) async {
+    final staleThreshold = DateTime.now().subtract(staleLockThreshold);
+    final now = DateTime.now();
+
+    // 1. Kilit satırı yoksa oluştur — varsa dokunma (IGNORE).
+    //    Çok eski bir acquiredAt ile başlatılır; böylece ilk worker
+    //    hemen stale olarak değerlendirip kilidi alabilir.
+    await _db.customStatement(
+      'INSERT OR IGNORE INTO active_worker_lock (id, acquired_at, owner_id) '
+      'VALUES (0, ?, NULL)',
+      [DateTime.fromMillisecondsSinceEpoch(0).toIso8601String()],
+    );
+
+    // 2. Atomik koşullu UPDATE: acquired_at < staleThreshold ise devral.
+    //    SQLite'ın tek yazar garantisi sayesinde iki worker aynı anda
+    //    bu UPDATE'ten rowsAffected==1 alamaz (bkz. §7).
+    final updated = await _db.customUpdate(
+      'UPDATE active_worker_lock '
+      'SET acquired_at = ?, owner_id = ? '
+      'WHERE id = 0 AND acquired_at < ?',
+      variables: [
+        Variable.withDateTime(now),
+        Variable.withString(ownerId),
+        Variable.withDateTime(staleThreshold),
+      ],
+      updates: {_db.activeWorkerLock},
+    );
+
+    return updated == 1;
+  }
+
+
+  @override
   Future<void> updateHeartbeat(String ownerId, DateTime acquiredAt) async {
-    await _db.into(_db.activeWorkerLock).insertOnConflictUpdate(
-          ActiveWorkerLockCompanion.insert(
-            id: const Value(0),
-            acquiredAt: acquiredAt,
-            ownerId: Value(ownerId),
-          ),
-        );
+    await _db.customUpdate(
+      'UPDATE active_worker_lock SET acquired_at = ?, owner_id = ? WHERE id = 0',
+      variables: [
+        Variable.withDateTime(acquiredAt),
+        Variable.withString(ownerId),
+      ],
+      updates: {_db.activeWorkerLock},
+    );
   }
 
   @override
@@ -214,6 +248,7 @@ class DriftPersistenceRepository implements PersistenceRepository {
           ..where((t) => t.id.equals(0)))
         .go();
   }
+
 
   // ── Reactive Streams ──────────────────────────────────────────────────────
 

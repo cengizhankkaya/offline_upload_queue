@@ -518,4 +518,103 @@ void main() {
       expect(repo.taskFor('pf-2'), isNotNull);
     });
   });
+
+  // ── Aşama 3: Kilit Mekanizması Testleri ─────────────────────────────────────
+  group('Kilit mekanizması (§7, §10 test #8)', () {
+    late InMemoryPersistenceRepository repo;
+    late MockConnectivityMonitor connectivity;
+    late MockUploadAdapter adapter;
+
+    QueueController makeController({String boxName = 'test-lock-box'}) {
+      return QueueController(
+        repository: repo,
+        adapter: adapter,
+        retryPolicy: RetryPolicy(
+          maxAttempts: 3,
+          backoff: BackoffStrategy.exponential(
+            base: const Duration(seconds: 2),
+            max: const Duration(minutes: 5),
+          ),
+        ),
+        connectivityMonitor: connectivity,
+        wifiOnly: false,
+        verifyChecksum: false,
+        copyToSandbox: false,
+        boxName: boxName,
+      );
+    }
+
+    setUp(() {
+      repo = InMemoryPersistenceRepository();
+      connectivity = MockConnectivityMonitor(ConnectivityStatus.wifi);
+      adapter = MockUploadAdapter.alwaysSuccess();
+    });
+
+    tearDown(() {
+      // Singleton set'i temizle — testler arası izolasyon
+      QueueController.resetForTesting('test-lock-box');
+    });
+
+    test('çift init() aynı boxName → StateError fırlatır', () async {
+      final c1 = makeController();
+      await c1.init();
+
+      final c2 = makeController();
+      expect(
+        () => c2.init(),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('already initialized'),
+        )),
+      );
+
+      await c1.dispose();
+    });
+
+    test('dispose() sonrası aynı boxName ile tekrar init() başarılı', () async {
+      final c1 = makeController();
+      await c1.init();
+      await c1.dispose();
+
+      // dispose() _activeBoxNames'ten çıkarmış olmalı
+      final c2 = makeController();
+      await expectLater(c2.init(), completes);
+      await c2.dispose();
+    });
+
+    test('staleLockThreshold < heartbeatInterval * 3 → ArgumentError', () {
+      final c = QueueController(
+        repository: repo,
+        adapter: adapter,
+        retryPolicy: RetryPolicy(
+          maxAttempts: 3,
+          backoff: BackoffStrategy.exponential(
+            base: const Duration(seconds: 2),
+            max: const Duration(minutes: 5),
+          ),
+        ),
+        connectivityMonitor: connectivity,
+        wifiOnly: false,
+        verifyChecksum: false,
+        copyToSandbox: false,
+        boxName: 'stale-arg-box',
+        advanced: const UploadQueueAdvancedOptions(
+          staleLockThreshold: Duration(seconds: 10),
+          heartbeatInterval: Duration(seconds: 30),
+        ),
+      );
+
+      expect(
+        () => c.init(),
+        throwsA(isA<ArgumentError>().having(
+          (e) => e.message,
+          'message',
+          contains('staleLockThreshold'),
+        )),
+      );
+
+      QueueController.resetForTesting('stale-arg-box');
+    });
+  });
 }
