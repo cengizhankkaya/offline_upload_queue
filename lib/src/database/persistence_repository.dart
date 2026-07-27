@@ -33,6 +33,7 @@ abstract class PersistenceRepository {
     required int sequenceNumber,
     int? fileSizeBytes,
     Map<String, dynamic>? metadata,
+    int priority = 0,
   });
 
   /// Sıradaki işlenebilir görevi döner.
@@ -150,6 +151,13 @@ abstract class PersistenceRepository {
   /// Sandbox kopyaları `completed` anında zaten silinmiştir;
   /// bu yalnızca DB satırlarının büyümesini önler.
   Future<void> purgeAllCompleted();
+
+  /// Kuyruktaki belirli durumdaki tüm görevleri temizler.
+  ///
+  /// Varsayılan olarak `permanentlyFailed`, `cancelled` ve `completed` durumlarını kapsar.
+  /// `includePending: true` ise `pending` görevler de silinir.
+  /// (Aktif `uploading` görevlere dokunulmaz — önce iptal edilmeleri gerekir).
+  Future<void> purgeAll({bool includePending = false});
 
   /// Kaynakları serbest bırakır. [QueueController.dispose()] tarafından çağrılır.
   Future<void> dispose();

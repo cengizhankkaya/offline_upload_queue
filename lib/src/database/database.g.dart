@@ -152,6 +152,18 @@ class $UploadTasksTable extends UploadTasks
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _priorityMeta = const VerificationMeta(
+    'priority',
+  );
+  @override
+  late final GeneratedColumn<int> priority = GeneratedColumn<int>(
+    'priority',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     localId,
@@ -167,6 +179,7 @@ class $UploadTasksTable extends UploadTasks
     errorMessage,
     createdAt,
     nextRetryAt,
+    priority,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -269,6 +282,12 @@ class $UploadTasksTable extends UploadTasks
         ),
       );
     }
+    if (data.containsKey('priority')) {
+      context.handle(
+        _priorityMeta,
+        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    }
     return context;
   }
 
@@ -338,6 +357,10 @@ class $UploadTasksTable extends UploadTasks
         DriftSqlType.dateTime,
         data['${effectivePrefix}next_retry_at'],
       ),
+      priority: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}priority'],
+      )!,
     );
   }
 
@@ -413,6 +436,15 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
   /// `null` ise görev hemen alınabilir.
   /// `getNextPending` sorgusu: `nextRetryAt IS NULL OR nextRetryAt <= :now`
   final DateTime? nextRetryAt;
+
+  /// Görev önceliği — yüksek değer önce işlenir.
+  ///
+  /// Varsayılan `0` — FIFO davranışı korunur.
+  /// `getNextPending` sıralaması: `priority DESC, sequenceNumber ASC`.
+  /// Yüksek priority eşit sequence'lardan önce alınır.
+  ///
+  /// ⚠️ **Schema v2'de eklendi** — mevcut kurulumlar otomatik migrate edilir.
+  final int priority;
   const UploadTaskData({
     required this.localId,
     required this.taskId,
@@ -427,6 +459,7 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
     this.errorMessage,
     required this.createdAt,
     this.nextRetryAt,
+    required this.priority,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -462,6 +495,7 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
     if (!nullToAbsent || nextRetryAt != null) {
       map['next_retry_at'] = Variable<DateTime>(nextRetryAt);
     }
+    map['priority'] = Variable<int>(priority);
     return map;
   }
 
@@ -492,6 +526,7 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
       nextRetryAt: nextRetryAt == null && nullToAbsent
           ? const Value.absent()
           : Value(nextRetryAt),
+      priority: Value(priority),
     );
   }
 
@@ -518,6 +553,7 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
       errorMessage: serializer.fromJson<String?>(json['errorMessage']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       nextRetryAt: serializer.fromJson<DateTime?>(json['nextRetryAt']),
+      priority: serializer.fromJson<int>(json['priority']),
     );
   }
   @override
@@ -541,6 +577,7 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
       'errorMessage': serializer.toJson<String?>(errorMessage),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'nextRetryAt': serializer.toJson<DateTime?>(nextRetryAt),
+      'priority': serializer.toJson<int>(priority),
     };
   }
 
@@ -558,6 +595,7 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
     Value<String?> errorMessage = const Value.absent(),
     DateTime? createdAt,
     Value<DateTime?> nextRetryAt = const Value.absent(),
+    int? priority,
   }) => UploadTaskData(
     localId: localId ?? this.localId,
     taskId: taskId ?? this.taskId,
@@ -574,6 +612,7 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
     errorMessage: errorMessage.present ? errorMessage.value : this.errorMessage,
     createdAt: createdAt ?? this.createdAt,
     nextRetryAt: nextRetryAt.present ? nextRetryAt.value : this.nextRetryAt,
+    priority: priority ?? this.priority,
   );
   UploadTaskData copyWithCompanion(UploadTasksCompanion data) {
     return UploadTaskData(
@@ -604,6 +643,7 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
       nextRetryAt: data.nextRetryAt.present
           ? data.nextRetryAt.value
           : this.nextRetryAt,
+      priority: data.priority.present ? data.priority.value : this.priority,
     );
   }
 
@@ -622,7 +662,8 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
           ..write('fileSizeBytes: $fileSizeBytes, ')
           ..write('errorMessage: $errorMessage, ')
           ..write('createdAt: $createdAt, ')
-          ..write('nextRetryAt: $nextRetryAt')
+          ..write('nextRetryAt: $nextRetryAt, ')
+          ..write('priority: $priority')
           ..write(')'))
         .toString();
   }
@@ -642,6 +683,7 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
     errorMessage,
     createdAt,
     nextRetryAt,
+    priority,
   );
   @override
   bool operator ==(Object other) =>
@@ -659,7 +701,8 @@ class UploadTaskData extends DataClass implements Insertable<UploadTaskData> {
           other.fileSizeBytes == this.fileSizeBytes &&
           other.errorMessage == this.errorMessage &&
           other.createdAt == this.createdAt &&
-          other.nextRetryAt == this.nextRetryAt);
+          other.nextRetryAt == this.nextRetryAt &&
+          other.priority == this.priority);
 }
 
 class UploadTasksCompanion extends UpdateCompanion<UploadTaskData> {
@@ -676,6 +719,7 @@ class UploadTasksCompanion extends UpdateCompanion<UploadTaskData> {
   final Value<String?> errorMessage;
   final Value<DateTime> createdAt;
   final Value<DateTime?> nextRetryAt;
+  final Value<int> priority;
   const UploadTasksCompanion({
     this.localId = const Value.absent(),
     this.taskId = const Value.absent(),
@@ -690,6 +734,7 @@ class UploadTasksCompanion extends UpdateCompanion<UploadTaskData> {
     this.errorMessage = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.nextRetryAt = const Value.absent(),
+    this.priority = const Value.absent(),
   });
   UploadTasksCompanion.insert({
     this.localId = const Value.absent(),
@@ -705,6 +750,7 @@ class UploadTasksCompanion extends UpdateCompanion<UploadTaskData> {
     this.errorMessage = const Value.absent(),
     required DateTime createdAt,
     this.nextRetryAt = const Value.absent(),
+    this.priority = const Value.absent(),
   }) : taskId = Value(taskId),
        filePath = Value(filePath),
        sequenceNumber = Value(sequenceNumber),
@@ -724,6 +770,7 @@ class UploadTasksCompanion extends UpdateCompanion<UploadTaskData> {
     Expression<String>? errorMessage,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? nextRetryAt,
+    Expression<int>? priority,
   }) {
     return RawValuesInsertable({
       if (localId != null) 'local_id': localId,
@@ -739,6 +786,7 @@ class UploadTasksCompanion extends UpdateCompanion<UploadTaskData> {
       if (errorMessage != null) 'error_message': errorMessage,
       if (createdAt != null) 'created_at': createdAt,
       if (nextRetryAt != null) 'next_retry_at': nextRetryAt,
+      if (priority != null) 'priority': priority,
     });
   }
 
@@ -756,6 +804,7 @@ class UploadTasksCompanion extends UpdateCompanion<UploadTaskData> {
     Value<String?>? errorMessage,
     Value<DateTime>? createdAt,
     Value<DateTime?>? nextRetryAt,
+    Value<int>? priority,
   }) {
     return UploadTasksCompanion(
       localId: localId ?? this.localId,
@@ -771,6 +820,7 @@ class UploadTasksCompanion extends UpdateCompanion<UploadTaskData> {
       errorMessage: errorMessage ?? this.errorMessage,
       createdAt: createdAt ?? this.createdAt,
       nextRetryAt: nextRetryAt ?? this.nextRetryAt,
+      priority: priority ?? this.priority,
     );
   }
 
@@ -820,6 +870,9 @@ class UploadTasksCompanion extends UpdateCompanion<UploadTaskData> {
     if (nextRetryAt.present) {
       map['next_retry_at'] = Variable<DateTime>(nextRetryAt.value);
     }
+    if (priority.present) {
+      map['priority'] = Variable<int>(priority.value);
+    }
     return map;
   }
 
@@ -838,7 +891,8 @@ class UploadTasksCompanion extends UpdateCompanion<UploadTaskData> {
           ..write('fileSizeBytes: $fileSizeBytes, ')
           ..write('errorMessage: $errorMessage, ')
           ..write('createdAt: $createdAt, ')
-          ..write('nextRetryAt: $nextRetryAt')
+          ..write('nextRetryAt: $nextRetryAt, ')
+          ..write('priority: $priority')
           ..write(')'))
         .toString();
   }
@@ -1113,7 +1167,7 @@ abstract class _$QueueDatabase extends GeneratedDatabase {
   );
   late final Index idxUploadTasksStatusRetrySeq = Index(
     'idx_upload_tasks_status_retry_seq',
-    'CREATE INDEX idx_upload_tasks_status_retry_seq ON upload_tasks (status, next_retry_at, sequence_number)',
+    'CREATE INDEX idx_upload_tasks_status_retry_seq ON upload_tasks (status, next_retry_at, priority, sequence_number)',
   );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -1141,6 +1195,7 @@ typedef $$UploadTasksTableCreateCompanionBuilder =
       Value<String?> errorMessage,
       required DateTime createdAt,
       Value<DateTime?> nextRetryAt,
+      Value<int> priority,
     });
 typedef $$UploadTasksTableUpdateCompanionBuilder =
     UploadTasksCompanion Function({
@@ -1157,6 +1212,7 @@ typedef $$UploadTasksTableUpdateCompanionBuilder =
       Value<String?> errorMessage,
       Value<DateTime> createdAt,
       Value<DateTime?> nextRetryAt,
+      Value<int> priority,
     });
 
 class $$UploadTasksTableFilterComposer
@@ -1234,6 +1290,11 @@ class $$UploadTasksTableFilterComposer
     column: $table.nextRetryAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$UploadTasksTableOrderingComposer
@@ -1309,6 +1370,11 @@ class $$UploadTasksTableOrderingComposer
     column: $table.nextRetryAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$UploadTasksTableAnnotationComposer
@@ -1373,6 +1439,9 @@ class $$UploadTasksTableAnnotationComposer
     column: $table.nextRetryAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
 }
 
 class $$UploadTasksTableTableManager
@@ -1419,6 +1488,7 @@ class $$UploadTasksTableTableManager
                 Value<String?> errorMessage = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> nextRetryAt = const Value.absent(),
+                Value<int> priority = const Value.absent(),
               }) => UploadTasksCompanion(
                 localId: localId,
                 taskId: taskId,
@@ -1433,6 +1503,7 @@ class $$UploadTasksTableTableManager
                 errorMessage: errorMessage,
                 createdAt: createdAt,
                 nextRetryAt: nextRetryAt,
+                priority: priority,
               ),
           createCompanionCallback:
               ({
@@ -1449,6 +1520,7 @@ class $$UploadTasksTableTableManager
                 Value<String?> errorMessage = const Value.absent(),
                 required DateTime createdAt,
                 Value<DateTime?> nextRetryAt = const Value.absent(),
+                Value<int> priority = const Value.absent(),
               }) => UploadTasksCompanion.insert(
                 localId: localId,
                 taskId: taskId,
@@ -1463,6 +1535,7 @@ class $$UploadTasksTableTableManager
                 errorMessage: errorMessage,
                 createdAt: createdAt,
                 nextRetryAt: nextRetryAt,
+                priority: priority,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

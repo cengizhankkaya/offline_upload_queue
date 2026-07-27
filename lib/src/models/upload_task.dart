@@ -20,6 +20,12 @@ class UploadTask {
   /// kullanın.
   final int sequenceNumber;
 
+  /// Görev önceliği (daha yüksek sayı = daha önce işlenir).
+  ///
+  /// Varsayılan `0`. Aynı önceliğe sahip görevler FIFO (`sequenceNumber`)
+  /// sırasına göre işlenir.
+  final int priority;
+
   /// Görevin anlık durumu.
   final UploadStatus status;
 
@@ -54,6 +60,7 @@ class UploadTask {
     required this.status,
     required this.retryCount,
     required this.createdAt,
+    this.priority = 0,
     this.failureType,
     this.metadata,
     this.checksum,
@@ -76,6 +83,7 @@ class UploadTask {
     String? errorMessage,
     DateTime? createdAt,
     DateTime? nextRetryAt,
+    int? priority,
   }) {
     return UploadTask(
       taskId: taskId ?? this.taskId,
@@ -90,6 +98,7 @@ class UploadTask {
       errorMessage: errorMessage ?? this.errorMessage,
       createdAt: createdAt ?? this.createdAt,
       nextRetryAt: nextRetryAt ?? this.nextRetryAt,
+      priority: priority ?? this.priority,
     );
   }
 

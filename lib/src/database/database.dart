@@ -35,23 +35,15 @@ class QueueDatabase extends _$QueueDatabase {
   QueueDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
     onUpgrade: (m, from, to) async {
-      // v1 → v2 ve sonrası için örnek şablon:
-      //
-      // if (from < 2) {
-      //   await m.addColumn(uploadTasks, uploadTasks.someNewColumn);
-      // }
-      // if (from < 3) {
-      //   await m.createTable(someNewTable);
-      // }
-      //
-      // Her `if (from < N)` bloğu bağımsız çalışır — kullanıcılar
-      // sürümleri atlayarak güncelleyebilir.
+      if (from < 2) {
+        await m.addColumn(uploadTasks, uploadTasks.priority);
+      }
     },
     beforeOpen: (details) async {
       // WAL modu etkinleştir — cross-isolate güvenli yazma için gerekli.

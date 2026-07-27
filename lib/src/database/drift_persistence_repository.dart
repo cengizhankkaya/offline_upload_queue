@@ -55,6 +55,7 @@ class DriftPersistenceRepository implements PersistenceRepository {
     required int sequenceNumber,
     int? fileSizeBytes,
     Map<String, dynamic>? metadata,
+    int priority = 0,
   }) async {
     final now = DateTime.now();
     final companion = UploadTasksCompanion.insert(
@@ -63,6 +64,7 @@ class DriftPersistenceRepository implements PersistenceRepository {
       sequenceNumber: sequenceNumber,
       status: UploadStatus.pending,
       createdAt: now,
+      priority: Value(priority),
       fileSizeBytes: Value(fileSizeBytes),
       metadataJson: Value(metadata != null ? jsonEncode(metadata) : null),
     );
@@ -74,6 +76,7 @@ class DriftPersistenceRepository implements PersistenceRepository {
       status: UploadStatus.pending,
       retryCount: 0,
       createdAt: now,
+      priority: priority,
       fileSizeBytes: fileSizeBytes,
       metadata: metadata,
     );
@@ -91,7 +94,10 @@ class DriftPersistenceRepository implements PersistenceRepository {
             t.status.equalsValue(UploadStatus.pending) &
             (t.nextRetryAt.isNull() | t.nextRetryAt.isSmallerOrEqualValue(now)),
       )
-      ..orderBy([(t) => OrderingTerm.asc(t.sequenceNumber)])
+      ..orderBy([
+        (t) => OrderingTerm.desc(t.priority),
+        (t) => OrderingTerm.asc(t.sequenceNumber),
+      ])
       ..limit(1);
     final row = await query.getSingleOrNull();
     return row == null ? null : _rowToTask(row);
@@ -359,7 +365,10 @@ class DriftPersistenceRepository implements PersistenceRepository {
     }
 
     query
-      ..orderBy([(t) => OrderingTerm.asc(t.sequenceNumber)])
+      ..orderBy([
+        (t) => OrderingTerm.desc(t.priority),
+        (t) => OrderingTerm.asc(t.sequenceNumber),
+      ])
       ..limit(limit, offset: offset);
 
     return query.watch().map((rows) => rows.map(_rowToTask).toList());
@@ -419,6 +428,17 @@ class DriftPersistenceRepository implements PersistenceRepository {
     )..where((t) => t.status.equalsValue(UploadStatus.completed))).go();
   }
 
+  @override
+  Future<void> purgeAll({bool includePending = false}) async {
+    await purgeAllFailed();
+    await purgeAllCancelled();
+    await purgeAllCompleted();
+    
+    if (includePending) {
+      await _purgeByStatus(UploadStatus.pending);
+    }
+  }
+
   Future<void> _purgeByStatus(UploadStatus status) async {
     final rows = await (_db.select(
       _db.uploadTasks,
@@ -475,6 +495,7 @@ class DriftPersistenceRepository implements PersistenceRepository {
       errorMessage: row.errorMessage,
       createdAt: row.createdAt,
       nextRetryAt: row.nextRetryAt,
+      priority: row.priority,
     );
   }
 }

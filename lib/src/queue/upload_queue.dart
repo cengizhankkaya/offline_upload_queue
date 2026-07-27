@@ -76,6 +76,11 @@ class UploadQueue {
   /// Her `boxName` bağımsız bir SQLite veritabanı dosyası kullanır.
   final String boxName;
 
+  /// `true` ise dosyanın SHA-256 checksum'ı kuyruğa eklendiği anda (enqueue)
+  /// hesaplanıp kaydedilir. Varsayılan: `false` (upload başlarken hesaplanır).
+  /// Büyük dosyalarda enqueue çağrısını senkron olarak yavaşlatabilir.
+  final bool pinChecksumAtEnqueue;
+
   /// `true` ise dosya kuyruğa alındığında paketin kendi sandbox dizinine
   /// kopyalanır; orijinal dosya silinse bile upload güvenli devam eder.
   /// Varsayılan: `true`.
@@ -112,6 +117,7 @@ class UploadQueue {
     this.backoff,
     this.verifyChecksum = true,
     this.boxName = 'default',
+    this.pinChecksumAtEnqueue = false,
     this.copyToSandbox = true,
     this.wifiOnly = false,
     this.connectivityMonitor,
@@ -158,6 +164,7 @@ class UploadQueue {
       wifiOnly: wifiOnly,
       verifyChecksum: verifyChecksum,
       copyToSandbox: copyToSandbox,
+      pinChecksumAtEnqueue: pinChecksumAtEnqueue,
       boxName: boxName,
       onAuthExpired: onAuthExpired,
       authTimeout: authTimeout,
@@ -178,9 +185,22 @@ class UploadQueue {
   Future<String> enqueue({
     required String filePath,
     Map<String, dynamic>? metadata,
+    int priority = 0,
   }) {
     _assertInitialized();
-    return _controller.enqueue(filePath: filePath, metadata: metadata);
+    return _controller.enqueue(
+      filePath: filePath, 
+      metadata: metadata,
+      priority: priority,
+    );
+  }
+
+  /// Birden fazla dosyayı tek seferde kuyruğa ekler ve taskId listesi döner.
+  Future<List<String>> enqueueBatch(
+    List<({String filePath, Map<String, dynamic>? metadata, int priority})> items,
+  ) {
+    _assertInitialized();
+    return _controller.enqueueBatch(items);
   }
 
   // ── Control ───────────────────────────────────────────────────────────────
@@ -296,6 +316,13 @@ class UploadQueue {
     return _controller.watchProgress(taskId);
   }
 
+  /// Tüm kuyruğun toplam ilerleme oranını (0.0–1.0) yayınlayan stream.
+  /// (completed) / (pending + uploading + failed + completed)
+  Stream<double> watchOverallProgress() {
+    _assertInitialized();
+    return _controller.watchOverallProgress();
+  }
+
   // ── Purge ─────────────────────────────────────────────────────────────────
 
   /// Tek bir görevi ve varsa sandbox kopyasını kalıcı olarak siler.
@@ -330,6 +357,15 @@ class UploadQueue {
   Future<void> purgeAllCompleted() {
     _assertInitialized();
     return _controller.purgeAllCompleted();
+  }
+
+  /// Kuyruktaki belirli durumdaki tüm görevleri temizler.
+  ///
+  /// Varsayılan olarak `permanentlyFailed`, `cancelled` ve `completed` durumlarını kapsar.
+  /// `includePending: true` ise `pending` görevler de silinir.
+  Future<void> purgeAll({bool includePending = false}) {
+    _assertInitialized();
+    return _controller.purgeAll(includePending: includePending);
   }
 
   // ── Dispose ───────────────────────────────────────────────────────────────

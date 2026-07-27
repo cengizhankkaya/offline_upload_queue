@@ -3,12 +3,12 @@ import 'package:drift/drift.dart';
 import '../models/upload_status.dart';
 
 /// Composite index: `getNextPending` sorgusunun yüksek performanslı çalışması
-/// için `status`, `nextRetryAt` ve `sequenceNumber` üzerinde.
+/// için `status`, `nextRetryAt`, `priority` ve `sequenceNumber` üzerinde.
 ///
 /// Kuyruk büyüdükçe bu index olmadan sorgu lineer taramaya döner.
 @TableIndex(
   name: 'idx_upload_tasks_status_retry_seq',
-  columns: {#status, #nextRetryAt, #sequenceNumber},
+  columns: {#status, #nextRetryAt, #priority, #sequenceNumber},
 )
 @DataClassName('UploadTaskData')
 class UploadTasks extends Table {
@@ -70,6 +70,15 @@ class UploadTasks extends Table {
   /// `null` ise görev hemen alınabilir.
   /// `getNextPending` sorgusu: `nextRetryAt IS NULL OR nextRetryAt <= :now`
   DateTimeColumn get nextRetryAt => dateTime().nullable()();
+
+  /// Görev önceliği — yüksek değer önce işlenir.
+  ///
+  /// Varsayılan `0` — FIFO davranışı korunur.
+  /// `getNextPending` sıralaması: `priority DESC, sequenceNumber ASC`.
+  /// Yüksek priority eşit sequence'lardan önce alınır.
+  ///
+  /// ⚠️ **Schema v2'de eklendi** — mevcut kurulumlar otomatik migrate edilir.
+  IntColumn get priority => integer().withDefault(const Constant(0))();
 
   @override
   List<Set<Column>> get uniqueKeys => [

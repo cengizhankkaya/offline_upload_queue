@@ -38,6 +38,7 @@ class QueueController {
   final bool _wifiOnly;
   final bool _verifyChecksum;
   final bool _copyToSandbox;
+  final bool _pinChecksumAtEnqueue;
   final String _boxName;
   final Future<void> Function()? _onAuthExpired;
   final Duration _authTimeout;
@@ -80,6 +81,7 @@ class QueueController {
     required bool wifiOnly,
     required bool verifyChecksum,
     required bool copyToSandbox,
+    bool pinChecksumAtEnqueue = false,
     required String boxName,
     Future<void> Function()? onAuthExpired,
     Duration authTimeout = const Duration(seconds: 30),
@@ -91,6 +93,7 @@ class QueueController {
        _wifiOnly = wifiOnly,
        _verifyChecksum = verifyChecksum,
        _copyToSandbox = copyToSandbox,
+       _pinChecksumAtEnqueue = pinChecksumAtEnqueue,
        _boxName = boxName,
        _onAuthExpired = onAuthExpired,
        _authTimeout = authTimeout,
@@ -207,6 +210,7 @@ class QueueController {
   Future<String> enqueue({
     required String filePath,
     Map<String, dynamic>? metadata,
+    int priority = 0,
   }) async {
     _assertDisposed();
 
@@ -246,10 +250,37 @@ class QueueController {
       sequenceNumber: sequenceNumber,
       fileSizeBytes: fileSizeBytes,
       metadata: metadata,
+      priority: priority,
     );
+
+    // 7. Checksum Pinning (opsiyonel)
+    if (_pinChecksumAtEnqueue) {
+      try {
+        final checksum = await _computeChecksum(actualPath);
+        await _repo.updateChecksum(taskId, checksum);
+      } catch (e) {
+        _log('enqueue() sırasında checksum hesaplanamadı: $e', level: LogLevel.warning);
+      }
+    }
 
     _triggerWorker();
     return taskId;
+  }
+
+  /// Toplu olarak görev ekler.
+  Future<List<String>> enqueueBatch(
+    List<({String filePath, Map<String, dynamic>? metadata, int priority})> items,
+  ) async {
+    _assertDisposed();
+    final ids = <String>[];
+    for (final item in items) {
+      ids.add(await enqueue(
+        filePath: item.filePath,
+        metadata: item.metadata,
+        priority: item.priority,
+      ));
+    }
+    return ids;
   }
 
   /// Görevi `pending`'e döndürür (manuel retry).
@@ -320,6 +351,18 @@ class QueueController {
     return _repo.watchProgress(taskId);
   }
 
+  /// Tüm kuyruğun toplam ilerleme oranını (0.0–1.0) yayınlar.
+  /// (completed) / (pending + uploading + failed + completed)
+  Stream<double> watchOverallProgress() {
+    return _repo
+        .watchSummary(isPaused: _paused, pausedDueToAuth: _pausedDueToAuth)
+        .map((s) {
+      final total = s.pending + s.uploading + s.failed + s.completed;
+      if (total == 0) return 0.0;
+      return s.completed / total;
+    });
+  }
+
   /// Tek bir görevi ve sandbox kopyasını kalıcı olarak siler.
   Future<void> purge(String taskId) => _repo.purge(taskId);
 
@@ -331,6 +374,12 @@ class QueueController {
 
   /// Tüm `completed` DB kayıtlarını siler.
   Future<void> purgeAllCompleted() => _repo.purgeAllCompleted();
+
+  /// Belirli durumdaki tüm görevleri temizler.
+  Future<void> purgeAll({bool includePending = false}) {
+    _assertDisposed();
+    return _repo.purgeAll(includePending: includePending);
+  }
 
   // ── Worker Loop ───────────────────────────────────────────────────────────
 
@@ -376,10 +425,10 @@ class QueueController {
   Future<void> _uploadTask(UploadTask task) async {
     await _repo.markUploading(task.taskId);
 
-    // Checksum hesapla
+    // Checksum hesapla veya enqueue'da pinlenmiş olanı kullan
     String checksum;
     try {
-      checksum = await _computeChecksum(task.filePath);
+      checksum = task.checksum ?? await _computeChecksum(task.filePath);
     } catch (e) {
       // Dosya okunamıyor — kısa retry mekanizması (3 deneme, bkz. Bölüm 3)
       if (task.retryCount < 2) {
@@ -603,6 +652,9 @@ class QueueController {
 
     // Bağlantı izlemeyi durdur
     await _connectivitySub?.cancel();
+    if (_connectivityMonitor is DefaultConnectivityMonitor) {
+      await _connectivityMonitor.dispose();
+    }
 
     // Aktif upload'ları iptal et ve pending'e döndür (cancelled değil!)
     // bkz. §8 — dispose() görevi cancelled'a almaz, sonraki init()'te
@@ -651,9 +703,9 @@ class QueueController {
   Future<String> _copyToSandboxDir(String sourcePath, String taskId) async {
     // Basit byte-kopyalama (v1.0 — hardlink v2 adayı)
     final source = File(sourcePath);
-    final ext = sourcePath.contains('.') ? sourcePath.split('.').last : '';
+    final ext = sourcePath.contains('.') ? '.${sourcePath.split('.').last}' : '';
     final destDir = await _getSandboxDir();
-    final destPath = '${destDir.path}/$taskId${ext.isNotEmpty ? '.$ext' : ''}';
+    final destPath = '${destDir.path}/$taskId$ext';
     await source.copy(destPath);
     return destPath;
   }

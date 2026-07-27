@@ -54,6 +54,7 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
     required int sequenceNumber,
     int? fileSizeBytes,
     Map<String, dynamic>? metadata,
+    int priority = 0,
   }) async {
     final task = UploadTask(
       taskId: taskId,
@@ -62,6 +63,7 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
       status: UploadStatus.pending,
       retryCount: 0,
       createdAt: DateTime.now(),
+      priority: priority,
       fileSizeBytes: fileSizeBytes,
       metadata: metadata,
     );
@@ -84,7 +86,11 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
                       t.nextRetryAt == now),
             )
             .toList()
-          ..sort((a, b) => a.sequenceNumber.compareTo(b.sequenceNumber));
+          ..sort((a, b) {
+            final cmp = b.priority.compareTo(a.priority);
+            if (cmp != 0) return cmp;
+            return a.sequenceNumber.compareTo(b.sequenceNumber);
+          });
     return candidates.isEmpty ? null : candidates.first;
   }
 
@@ -283,7 +289,11 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   }) {
     return _changeNotifier.stream.map((_) {
       var list = _tasks.values.toList()
-        ..sort((a, b) => a.sequenceNumber.compareTo(b.sequenceNumber));
+        ..sort((a, b) {
+          final cmp = b.priority.compareTo(a.priority);
+          if (cmp != 0) return cmp;
+          return a.sequenceNumber.compareTo(b.sequenceNumber);
+        });
       if (statuses != null) {
         list = list.where((t) => statuses.contains(t.status)).toList();
       }
@@ -327,6 +337,17 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   Future<void> purgeAllCompleted() async {
     _tasks.removeWhere((_, t) => t.status == UploadStatus.completed);
     _notify();
+  }
+
+  @override
+  Future<void> purgeAll({bool includePending = false}) async {
+    await purgeAllFailed();
+    await purgeAllCancelled();
+    await purgeAllCompleted();
+    if (includePending) {
+      _tasks.removeWhere((_, t) => t.status == UploadStatus.pending);
+      _notify();
+    }
   }
 
   // ── Dispose ───────────────────────────────────────────────────────────────

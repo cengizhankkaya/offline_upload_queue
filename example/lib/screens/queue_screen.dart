@@ -19,12 +19,13 @@ class QueueScreen extends StatelessWidget {
     final picker = ImagePicker();
     final files = await picker.pickMultiImage();
     if (files.isEmpty) return;
-    for (final f in files) {
-      await uploadQueue.enqueue(
-        filePath: f.path,
-        metadata: {'source': 'gallery', 'name': f.name},
-      );
-    }
+    final items = files.map((f) => (
+      filePath: f.path,
+      metadata: <String, dynamic>{'source': 'gallery', 'name': f.name},
+      priority: 0,
+    )).toList();
+    
+    await uploadQueue.enqueueBatch(items);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${files.length} dosya kuyruğa eklendi')),
@@ -82,6 +83,35 @@ class QueueScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+              );
+            },
+          ),
+
+          // ── Genel İlerleme (Overall Progress) ───────────────────────────────
+          StreamBuilder<double>(
+            stream: uploadQueue.watchOverallProgress(),
+            builder: (context, snap) {
+              final progress = snap.data ?? 0.0;
+              // 0.0 veya 1.0 (hiç işlem yok veya bitti) ise çubuğu gizle
+              if (progress == 0.0 || progress == 1.0) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Genel İlerleme: ${(progress * 100).toStringAsFixed(1)}%',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 6),
+                    LinearProgressIndicator(
+                      value: progress,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ],
+                ),
               );
             },
           ),
