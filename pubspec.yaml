@@ -1,5 +1,5 @@
 name: offline_upload_queue
-description: "A new Flutter package project."
+description: "Offline-first image upload queue for Flutter — persistent, retry-capable, background-aware."
 version: 0.0.1
 homepage:
 
@@ -10,11 +10,22 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  drift: ^2.26.0
+  sqlite3_flutter_libs: ^0.5.28
+  dio: ^5.8.0+1
+  connectivity_plus: ^6.1.4
+  crypto: ^3.0.6
+  uuid: ^4.5.1
+  path_provider: ^2.1.5
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  build_runner: ^2.4.15
+  drift_dev: ^2.26.0
+  test: ^1.31.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
