@@ -184,12 +184,22 @@ class UploadQueue {
   // ── Control ───────────────────────────────────────────────────────────────
 
   /// `permanentlyFailed` veya `cancelled` görevi tekrar `pending`'e alır.
+  ///
+  /// `retryCount` ve `nextRetryAt` sıfırlanır — görev ilk kez deneniyormuş
+  /// gibi kuyruğun en önüne eklenir.
+  ///
+  /// Throws [StateError] if `init()` has not been called.
   Future<void> retry(String taskId) {
     _assertInitialized();
     return _controller.retry(taskId);
   }
 
   /// Görevi iptal eder. Aktif upload varsa HTTP isteğini keser.
+  ///
+  /// Görev `cancelled` durumuna geçirilir. İlişkili sandbox kopyası
+  /// silinmez — `purge()` veya `purgeAllCancelled()` ile temizlenmelidir.
+  ///
+  /// Throws [StateError] if `init()` has not been called.
   Future<void> cancel(String taskId) {
     _assertInitialized();
     return _controller.cancel(taskId);
@@ -198,12 +208,16 @@ class UploadQueue {
   /// Worker'ı geçici durdurur (in-memory; uygulama yeniden başlatılırsa sıfırlanır).
   ///
   /// Devam eden upload'ı kesmez — yalnızca yeni görev almayı engeller.
+  /// `watchSummary()` üzerinden `isPaused: true` olarak yansır.
   void pause() {
     _assertInitialized();
     _controller.pause();
   }
 
   /// Duraklatılmış worker'ı yeniden başlatır.
+  ///
+  /// `pause()` aktif değilse no-op. `watchSummary()` üzerinden
+  /// `isPaused: false` olarak yansır.
   Future<void> resume() async {
     _assertInitialized();
     _controller.resume();
@@ -231,14 +245,29 @@ class UploadQueue {
 
   /// Filtrelenmiş görev listesini yayınlayan reaktif stream.
   ///
-  /// ```dart
-  /// queue.watchTasks(statuses: {UploadStatus.pending}).listen((tasks) {
-  ///   // Yalnızca pending görevler
-  /// });
-  /// ```
+  /// `UploadTasks` tablosundaki herhangi bir değişiklik sonrası otomatik
+  /// yeni bir liste yayınlar.
   ///
-  /// Filtre veya sayfa değiştiğinde eski aboneliği iptal edip yenisini açın
-  /// (bkz. dartdoc uyarısı — Bölüm 8).
+  /// ## Önemli
+  ///
+  /// `sequenceNumber` kullanıcıya gösterilecek bir sıra sayacı değildir;
+  /// yalnızca worker'ın işleme sırasını belirler. UI'da "N. sıradaki fotoğraf"
+  /// göstermek için liste index'ini (0, 1, 2 …) kullanın.
+  ///
+  /// Filtre veya sayfa değiştiğinde eski aboneliği iptal edip yenisini açın.
+  ///
+  /// ```dart
+  /// final sub = queue.watchTasks(
+  ///   statuses: {UploadStatus.pending, UploadStatus.failed},
+  ///   limit: 20,
+  /// ).listen((tasks) {
+  ///   for (final (i, t) in tasks.indexed) {
+  ///     print('${i + 1}. sıra: ${t.taskId}');
+  ///   }
+  /// });
+  /// // ...
+  /// await sub.cancel(); // Filtre değiştiğinde
+  /// ```
   Stream<List<UploadTask>> watchTasks({
     Set<UploadStatus>? statuses,
     int limit = 50,
@@ -251,8 +280,12 @@ class UploadQueue {
 
   /// Tek bir görevin upload ilerleme oranını (0.0–1.0) yayınlayan stream.
   ///
-  /// Yalnızca `uploading` sırasında anlamlı değerler yayınlar.
-  /// Listener yoksa adapter'a `onProgress` hiç geçirilmez (sıfır maliyet).
+  /// Yalnızca `uploading` sırasında anlamlı değerler yayınlar; görev
+  /// `completed` veya `failed`'e düştüğünde stream kapanmaz, yeni değer
+  /// yayınlamaz.
+  ///
+  /// **Performans:** Listener yokken `onProgress` callback'i adapter'a hiç
+  /// geçirilmez — gereksiz chunk başına closure maliyeti yoktur.
   Stream<double> watchProgress(String taskId) {
     _assertInitialized();
     return _controller.watchProgress(taskId);
@@ -261,12 +294,19 @@ class UploadQueue {
   // ── Purge ─────────────────────────────────────────────────────────────────
 
   /// Tek bir görevi ve varsa sandbox kopyasını kalıcı olarak siler.
+  ///
+  /// Yalnızca `permanentlyFailed` veya `cancelled` durumundaki görevler
+  /// silinebilir. Aktif (`pending`, `uploading`, `failed`) görevlere uygulamak
+  /// için önce `cancel()` çağırın.
   Future<void> purge(String taskId) {
     _assertInitialized();
     return _controller.purge(taskId);
   }
 
   /// Tüm `permanentlyFailed` görevleri ve sandbox kopyalarını siler.
+  ///
+  /// Tipik kullanım: kullanıcıya "N görev kalıcı hatayla başarısız oldu —
+  /// temizlemek istiyor musunuz?" sorusu ardından.
   Future<void> purgeAllFailed() {
     _assertInitialized();
     return _controller.purgeAllFailed();
@@ -280,7 +320,8 @@ class UploadQueue {
 
   /// Tüm `completed` görevlerin DB kayıtlarını siler.
   ///
-  /// Sandbox kopyaları zaten `completed` anında silinmiştir.
+  /// Sandbox kopyaları zaten `completed` anında silinmiştir;
+  /// bu çağrı yalnızca DB satırlarının birikmesini önler.
   Future<void> purgeAllCompleted() {
     _assertInitialized();
     return _controller.purgeAllCompleted();
@@ -299,6 +340,20 @@ class UploadQueue {
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  /// Arka plan görev süre sınırını bildirir.
+  ///
+  /// iOS `BGTaskScheduler` ve Android Workmanager gibi arka plan ortamlarında
+  /// OS'un kalan bütçesi içinde `authTimeout`'un taşmasını önlemek için
+  /// [BackgroundTaskRunner] tarafından otomatik olarak çağrılır.
+  ///
+  /// `deadline` `null` geçilirse sınır kaldırılır.
+  /// Doğrudan çağırmanız gerekmez — [BackgroundTaskRunner.run] bunu yönetir.
+  void setBackgroundDeadline(DateTime? deadline) {
+    if (_initialized) {
+      _controller.setBackgroundDeadline(deadline);
+    }
+  }
 
   void _assertInitialized() {
     if (!_initialized) {

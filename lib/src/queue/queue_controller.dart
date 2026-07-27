@@ -53,6 +53,7 @@ class QueueController {
   bool _disposed = false;
   bool _lockAcquired = false;
   final _activeTokens = <String, UploadCancelToken>{};
+  DateTime? _backgroundDeadline;
 
   // forceUploadOnce snapshot: bu taskId'ler wifiOnly bypass ile işlenebilir
   final _forceUploadSnapshot = <String>{};
@@ -496,7 +497,14 @@ class QueueController {
     if (failureType == FailureType.authExpired && authCallback != null) {
       _pausedDueToAuth = true;
       try {
-        await authCallback().timeout(_authTimeout);
+        var effectiveTimeout = _authTimeout;
+        if (_backgroundDeadline != null) {
+          final remaining = _backgroundDeadline!.difference(DateTime.now());
+          if (remaining < effectiveTimeout) {
+            effectiveTimeout = remaining.isNegative ? Duration.zero : remaining;
+          }
+        }
+        await authCallback().timeout(effectiveTimeout);
         _pausedDueToAuth = false;
         // Auth yenilendi — görevi pending'e al ve tekrar dene
         await _repo.markPending(task.taskId);
@@ -664,6 +672,10 @@ class QueueController {
     if (_disposed) {
       throw StateError('QueueController.dispose() çağrıldıktan sonra kullanılamaz');
     }
+  }
+
+  void setBackgroundDeadline(DateTime? deadline) {
+    _backgroundDeadline = deadline;
   }
 
   /// **Yalnızca test ortamında kullanın.**

@@ -2,3 +2,9 @@ include: package:flutter_lints/flutter.yaml
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options
+
+linter:
+  rules:
+    # QueueController uses renamed parameters (repository → _repo, etc.) which
+    # are not eligible for initializing formals. Disable to avoid false positives.
+    prefer_initializing_formals: false

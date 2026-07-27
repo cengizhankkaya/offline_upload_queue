@@ -12,6 +12,12 @@ class UploadTask {
   final String filePath;
 
   /// Monoton artan mantıksal sıra numarası.
+  ///
+  /// Worker'a işleme sırasını belirler, UI'da "N. sıradaki fotoğraf" gibi
+  /// bir sayı olarak gösterilmemeli. Sebebi: görev silindiğinde veya
+  /// `retry()` ile tekrar eklenirken numara güncellenmez, boşluklar
+  /// oluşabilir. UI sıra göstergesi için listedeki index'i (0, 1, 2 …)
+  /// kullanın.
   final int sequenceNumber;
 
   /// Görevin anlık durumu.

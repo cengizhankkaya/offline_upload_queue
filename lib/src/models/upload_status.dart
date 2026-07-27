@@ -1,12 +1,17 @@
-/// Enum'lardaki değer sırası Drift'in `intEnum<T>()` ile veritabanına
-/// integer olarak kaydedilir. Yeni değerler yalnızca **sona** eklenmeli;
-/// mevcut değerlerin sırası kesinlikle değiştirilmemeli — aksi hâlde var
-/// olan kayıtların anlamı kayar ve veri bozulması oluşur.
+/// Upload durumu ve hata tipi enum'ları.
+///
+/// ⚠️ **Kritik:** Drift `intEnum<T>()` ile integer olarak veritabanına
+/// kaydedilir. Mevcut değerlerin sırası kesinlikle değiştirilmemeli;
+/// yeni değerler yalnızca **sona** eklenmeli. Aksi hâlde var olan
+/// kayıtların anlamı kayar ve sessiz veri bozulması oluşur.
+/// 
+/// Yükleme işlemleri için durum yönetimi ve hata sınıflandırması sağlar.
 library;
 
 /// Bir yükleme görevinin anlık durumu.
 enum UploadStatus {
-  /// Kuyruğa alındı, henüz işlenmedi.
+  /// Kuyrukta bekliyor, henüz işlenmedi.
+  /// Bu durumdaki görevler worker tarafından `sequenceNumber ASC` sırasıyla alınır.
   pending,
 
   /// Worker tarafından alındı, yükleme devam ediyor.

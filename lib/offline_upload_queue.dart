@@ -15,6 +15,11 @@ export 'src/network/upload_adapter.dart';
 export 'src/network/rest_upload_adapter.dart';
 export 'src/network/connectivity_monitor.dart';
 
+// ── Arka plan çalışma (iOS / Android) ────────────────────────────────────────
+export 'src/background/ios_background_channel.dart';
+export 'src/background/android_background_runner.dart';
+export 'src/background/background_task_runner.dart';
+
 // ── Kuyruk (public API) ───────────────────────────────────────────────────────
 export 'src/queue/upload_queue.dart';
 export 'src/queue/upload_queue_options.dart' show UploadQueueAdvancedOptions, LogLevel;

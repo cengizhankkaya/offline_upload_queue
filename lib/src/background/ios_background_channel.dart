@@ -82,7 +82,14 @@ import 'package:flutter/services.dart';
 ///
 /// ```dart
 /// // Uygulama başlangıcında (foreground):
-/// IosBackgroundChannel.instance.setMethodCallHandler(queue);
+/// IosBackgroundChannel.instance.setMethodCallHandler(
+///   onAppRefresh: () => BackgroundTaskRunner.run(queue),
+///   onProcessing: () => BackgroundTaskRunner.run(queue),
+///   onExpiration: () {
+///     // Sistem süremiz bitti dediğinde aktif upload'ları iptal edip pending'e döndür.
+///     queue.dispose();
+///   },
+/// );
 ///
 /// // Her iki görevi de zamanla (paralel):
 /// await IosBackgroundChannel.instance.scheduleAppRefresh(

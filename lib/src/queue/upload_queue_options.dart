@@ -38,6 +38,11 @@ class UploadQueueAdvancedOptions {
   /// Bir worker bu süre boyunca heartbeat göndermezse, bir sonraki `init()`
   /// çağrısı kilidi devralar ve `uploading → pending` recovery yapar.
   ///
+  /// **Kalibrasyona dikkat:** Varsayılan `5 dakika` deneysel bir tahmindir;
+  /// gerçek yazım sürelerinize göre ayarlanmalıdır. Çok kısa seçilirse
+  /// yaşayan bir worker'a ait kilit yanlışlıkla devralınabilir. Çok uzun
+  /// seçilirse kilitli görev uzun süre işlenmeden kalır.
+  ///
   /// **Kısıt:** `staleLockThreshold >= heartbeatInterval * 3` olmalı;
   /// aksi halde `init()` `ArgumentError` fırlatır.
   final Duration staleLockThreshold;
