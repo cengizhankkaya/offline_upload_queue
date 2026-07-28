@@ -1,6 +1,6 @@
 name: offline_upload_queue
 description: "Offline-first image upload queue for Flutter — persistent, retry-capable, background-aware."
-version: 0.1.0
+version: 0.4.0
 homepage: https://github.com/cengizhankkaya/offline_upload_queue
 repository: https://github.com/cengizhankkaya/offline_upload_queue
 issue_tracker: https://github.com/cengizhankkaya/offline_upload_queue/issues

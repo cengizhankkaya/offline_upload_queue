@@ -254,12 +254,12 @@ class DriftPersistenceRepository implements PersistenceRepository {
     final now = DateTime.now();
 
     // 1. Kilit satırı yoksa oluştur — varsa dokunma (IGNORE).
-    //    Çok eski bir acquiredAt ile başlatılır; böylece ilk worker
-    //    hemen stale olarak değerlendirip kilidi alabilir.
+    //    epoch=0 integer ile başlatılır (Drift DateTime → unix ms int).
+    //    Bu sayede UPDATE koşulu (acquired_at < staleThreshold) integer
+    //    karşılaştırması yapar ve ilk worker hemen kilidi alabilir.
     await _db.customStatement(
       'INSERT OR IGNORE INTO active_worker_lock (id, acquired_at, owner_id) '
-      'VALUES (0, ?, NULL)',
-      [DateTime.fromMillisecondsSinceEpoch(0).toIso8601String()],
+      'VALUES (0, 0, NULL)',
     );
 
     // 2. Atomik koşullu UPDATE: acquired_at < staleThreshold ise devral.

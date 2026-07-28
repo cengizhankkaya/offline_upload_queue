@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 1: Static analysis + full unit test suite
+  # ─────────────────────────────────────────────────────────────────────────────
+  analyze_and_test:
+    name: Analyze & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run flutter analyze
+        run: flutter analyze --fatal-infos
+
+      - name: Run unit tests
+        run: |
+          flutter test \
+            --exclude-tags cross_isolate \
+            --reporter expanded
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 2: Cross-isolate tests (separate job — §1 / test #12 requirement)
+  #
+  # Tests tagged @Tags(['cross_isolate']) spin up real Dart Isolates + a shared
+  # SQLite WAL database. Running in a separate job prevents flaky cross-isolate
+  # failures from obscuring regressions in the main test suite.
+  # ─────────────────────────────────────────────────────────────────────────────
+  cross_isolate_test:
+    name: Cross-Isolate Test
+    runs-on: ubuntu-latest
+    # Intentionally has no `needs:` — runs in parallel and fails independently.
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run cross-isolate tests
+        run: |
+          flutter test test/cross_isolate_test.dart \
+            --tags cross_isolate \
+            --reporter expanded
