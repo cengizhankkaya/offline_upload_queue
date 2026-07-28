@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:offline_upload_queue/offline_upload_queue.dart';
@@ -95,8 +96,9 @@ QueueController makeController({
 // ── Testler ───────────────────────────────────────────────────────────────────
 
 void main() {
-  // ── Enum sıra koruması (Drift intEnum) ─────────────────────────────────────
-  group('UploadStatus enum (Drift intEnum sıra koruması)', () {
+  // ── Enum sıra koruması (sembast intEnum) ─────────────────────────────────────
+  group('UploadStatus enum (sembast int index sıra koruması)', () {
+    tearDown(() => QueueController.resetForTesting('test'));
     test('sıra sabit — index değerleri değişmemeli', () {
       expect(UploadStatus.pending.index, 0);
       expect(UploadStatus.uploading.index, 1);
@@ -107,7 +109,7 @@ void main() {
     });
   });
 
-  group('FailureType enum (Drift intEnum sıra koruması)', () {
+  group('FailureType enum (sembast int index sıra koruması)', () {
     test('sıra sabit — index değerleri değişmemeli', () {
       expect(FailureType.network.index, 0);
       expect(FailureType.serverError.index, 1);
@@ -199,15 +201,25 @@ void main() {
   group('QueueController state machine', () {
     late InMemoryPersistenceRepository repo;
     late MockConnectivityMonitor monitor;
+    late File fakeFile;
+    late String fakeFilePath;
 
-    setUp(() {
+    setUp(() async {
       repo = InMemoryPersistenceRepository();
       monitor = MockConnectivityMonitor(ConnectivityStatus.wifi);
+      fakeFile = File(
+        '${Directory.systemTemp.path}/test_sm_${DateTime.now().microsecondsSinceEpoch}.jpg',
+      )..writeAsBytesSync([0x00, 0x01, 0x02]);
+      fakeFilePath = fakeFile.path;
     });
 
     tearDown(() async {
+      // resetForTesting: timeout sonrası dispose edilemeyen controller’ların
+      // boxName’i _activeBoxNames set’inde takılı kalmasını önler.
+      QueueController.resetForTesting('test');
       await repo.dispose();
       monitor.dispose();
+      if (fakeFile.existsSync()) fakeFile.deleteSync();
     });
 
     test('wifiOnly:true + cellular → görev pending kalır', () async {
@@ -223,9 +235,10 @@ void main() {
 
       await repo.enqueue(
         taskId: 'task-1',
-        filePath: '/fake/photo.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 1,
       );
+      controller.triggerWorkerForTesting(); // wifiOnly+cellular → pending kalmalı
       await Future.delayed(const Duration(milliseconds: 100));
 
       expect(repo.taskFor('task-1')?.status, UploadStatus.pending);
@@ -250,10 +263,10 @@ void main() {
 
       await repo.enqueue(
         taskId: 'task-2',
-        filePath: '/fake/photo.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 2,
       );
-      await controller.forceUploadOnce();
+      await controller.forceUploadOnce(); // snapshot alır + trigger
       await completer.future.timeout(const Duration(seconds: 2));
 
       await Future.delayed(const Duration(milliseconds: 50));
@@ -273,11 +286,12 @@ void main() {
 
       await repo.enqueue(
         taskId: 'task-3',
-        filePath: '/fake/photo.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 3,
       );
       controller.pause();
-      await controller.forceUploadOnce();
+      controller.triggerWorkerForTesting(); // pause aktif → işlenmemeli
+      await controller.forceUploadOnce();  // pause aktif → return yapar
       await Future.delayed(const Duration(milliseconds: 100));
 
       expect(repo.taskFor('task-3')?.status, UploadStatus.pending);
@@ -297,7 +311,7 @@ void main() {
 
       await repo.enqueue(
         taskId: 'task-4',
-        filePath: '/fake/photo.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 4,
       );
       repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
@@ -307,6 +321,7 @@ void main() {
           completer.complete();
         }
       });
+      controller.triggerWorkerForTesting(); // repo.enqueue() sonrası worker'a haber ver
 
       await completer.future.timeout(const Duration(seconds: 2));
       expect(repo.taskFor('task-4')?.status, UploadStatus.permanentlyFailed);
@@ -327,7 +342,7 @@ void main() {
 
       await repo.enqueue(
         taskId: 'task-5',
-        filePath: '/fake/photo.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 5,
       );
       repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
@@ -337,6 +352,7 @@ void main() {
           completer.complete();
         }
       });
+      controller.triggerWorkerForTesting();
 
       await completer.future.timeout(const Duration(seconds: 3));
       expect(repo.taskFor('task-5')?.status, UploadStatus.permanentlyFailed);
@@ -358,7 +374,7 @@ void main() {
 
         await repo.enqueue(
           taskId: 'task-6',
-          filePath: '/fake/photo.jpg',
+          filePath: fakeFilePath,
           sequenceNumber: 6,
         );
         repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
@@ -369,6 +385,7 @@ void main() {
             completer.complete();
           }
         });
+        controller.triggerWorkerForTesting();
 
         await completer.future.timeout(const Duration(seconds: 2));
         expect(repo.taskFor('task-6')?.status, UploadStatus.permanentlyFailed);
@@ -380,7 +397,7 @@ void main() {
     test('init() uploading → pending recovery yapar', () async {
       await repo.enqueue(
         taskId: 'task-7',
-        filePath: '/fake/photo.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 7,
       );
       await repo.markUploading('task-7');
@@ -394,12 +411,12 @@ void main() {
     test('watchTasks({pending}) yalnızca pending döner', () async {
       await repo.enqueue(
         taskId: 'task-8a',
-        filePath: '/fake/a.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 8,
       );
       await repo.enqueue(
         taskId: 'task-8b',
-        filePath: '/fake/b.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 9,
       );
       await repo.markCompleted('task-8b');
@@ -414,12 +431,12 @@ void main() {
     test('purgeAllCompleted() → completed kayıtlar silinir', () async {
       await repo.enqueue(
         taskId: 'task-9a',
-        filePath: '/fake/a.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 10,
       );
       await repo.enqueue(
         taskId: 'task-9b',
-        filePath: '/fake/b.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 11,
       );
       await repo.markCompleted('task-9a');
@@ -457,11 +474,13 @@ void main() {
 
         await repo.enqueue(
           taskId: 'task-10',
-          filePath: '/fake/photo.jpg',
+          filePath: fakeFilePath,
           sequenceNumber: 12,
           fileSizeBytes: 200,
         );
-        await Future.delayed(const Duration(milliseconds: 200));
+        // Heartbeat timer 50ms aralıkla çalışır; 300ms bekleyerek en az 2 heartbeat
+        // tetiklenmiş olmasını sağlıyoruz.
+        await Future.delayed(const Duration(milliseconds: 300));
 
         expect(capturedCurrent, isNotNull);
         expect(capturedCurrent, greaterThan(100));
@@ -484,12 +503,12 @@ void main() {
     test('purgeAllCancelled() → cancelled kayıtlar temizlenir', () async {
       await repo.enqueue(
         taskId: 'task-12a',
-        filePath: '/fake/a.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 13,
       );
       await repo.enqueue(
         taskId: 'task-12b',
-        filePath: '/fake/b.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 14,
       );
       await repo.markCancelled('task-12a');
@@ -505,13 +524,13 @@ void main() {
       () async {
         await repo.enqueue(
           taskId: 'disk-1',
-          filePath: '/fake/a.jpg',
+          filePath: fakeFilePath,
           sequenceNumber: 15,
           fileSizeBytes: 100,
         );
         await repo.enqueue(
           taskId: 'disk-2',
-          filePath: '/fake/b.jpg',
+          filePath: fakeFilePath,
           sequenceNumber: 16,
           fileSizeBytes: 200,
         );
@@ -519,7 +538,7 @@ void main() {
 
         await repo.enqueue(
           taskId: 'disk-trigger',
-          filePath: '/fake/c.jpg',
+          filePath: fakeFilePath,
           sequenceNumber: 17,
           fileSizeBytes: 0,
         );
@@ -535,15 +554,25 @@ void main() {
   group('Aşama 2 — Dayanıklılık doğrulamaları', () {
     late InMemoryPersistenceRepository repo;
     late MockConnectivityMonitor monitor;
+    late File fakeFile;
+    late String fakeFilePath;
 
-    setUp(() {
+    setUp(() async {
       repo = InMemoryPersistenceRepository();
       monitor = MockConnectivityMonitor(ConnectivityStatus.wifi);
+      fakeFile = File(
+        '${Directory.systemTemp.path}/test_a2_${DateTime.now().microsecondsSinceEpoch}.jpg',
+      )..writeAsBytesSync([0x00, 0x01, 0x02]);
+      fakeFilePath = fakeFile.path;
     });
 
     tearDown(() async {
+      // resetForTesting: timeout sonrası dispose edilemeyen controller’ların
+      // boxName’i _activeBoxNames set’inde takılı kalmasını önler.
+      QueueController.resetForTesting('test');
       await repo.dispose();
       monitor.dispose();
+      if (fakeFile.existsSync()) fakeFile.deleteSync();
     });
 
     test(
@@ -551,7 +580,7 @@ void main() {
       () async {
         await repo.enqueue(
           taskId: 'cancel-1',
-          filePath: '/fake/photo.jpg',
+          filePath: fakeFilePath,
           sequenceNumber: 100,
         );
         await repo.markFailed(
@@ -570,14 +599,14 @@ void main() {
       final seq1 = await repo.getNextSequenceNumber();
       await repo.enqueue(
         taskId: 'seq-1',
-        filePath: '/fake/a.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: seq1,
       );
 
       final seq2 = await repo.getNextSequenceNumber();
       await repo.enqueue(
         taskId: 'seq-2',
-        filePath: '/fake/b.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: seq2,
       );
 
@@ -623,7 +652,7 @@ void main() {
 
       await repo.enqueue(
         taskId: 'retry-1',
-        filePath: '/fake/photo.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 200,
       );
 
@@ -635,7 +664,9 @@ void main() {
           permanentCompleter.complete();
         }
       });
+      controller.triggerWorkerForTesting();
       await permanentCompleter.future.timeout(const Duration(seconds: 2));
+
 
       repo.watchTasks(statuses: {UploadStatus.completed}).listen((tasks) {
         if (tasks.any((t) => t.taskId == 'retry-1') &&
@@ -656,7 +687,7 @@ void main() {
       () async {
         await repo.enqueue(
           taskId: 'backoff-1',
-          filePath: '/fake/photo.jpg',
+          filePath: fakeFilePath,
           sequenceNumber: 300,
         );
         await repo.markFailed(
@@ -673,12 +704,12 @@ void main() {
     test('purgeAllFailed() → yalnızca permanentlyFailed silinir', () async {
       await repo.enqueue(
         taskId: 'pf-1',
-        filePath: '/fake/a.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 400,
       );
       await repo.enqueue(
         taskId: 'pf-2',
-        filePath: '/fake/b.jpg',
+        filePath: fakeFilePath,
         sequenceNumber: 401,
       );
       await repo.markPermanentlyFailed(

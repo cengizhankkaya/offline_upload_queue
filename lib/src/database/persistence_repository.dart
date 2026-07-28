@@ -5,13 +5,13 @@ import '../models/upload_task.dart';
 /// Kalıcı depolama katmanının soyutlaması.
 ///
 /// `QueueController` (worker) yalnızca bu arayüz üzerinden DB'ye erişir.
-/// Bu ayrım, state machine'in tüm birim testlerinin gerçek Drift/SQLite
+/// Bu ayrım, state machine'in tüm birim testlerinin gerçek sembast
 /// olmadan, `InMemoryPersistenceRepository` gibi bir mock üzerinden
 /// koşabilmesini sağlar.
 ///
 /// ## İmplementasyonlar
 ///
-/// - [DriftPersistenceRepository]: Gerçek SQLite (production)
+/// - [SembastPersistenceRepository]: Gerçek sembast dosya store'u (production)
 /// - `InMemoryPersistenceRepository` (`test/helpers/`): Birim testler için
 abstract class PersistenceRepository {
   /// Depolamayı başlatır ve crash recovery yapar.
@@ -95,8 +95,9 @@ abstract class PersistenceRepository {
   /// kilidi [ownerId]'ye aktarır ve `true` döner.
   /// Başka bir worker kilidi tazeliyorsa `false` döner.
   ///
-  /// SQLite'ın tek yazar garantisi sayesinde bu işlem atomiktir —
-  /// iki worker aynı anda `true` alamaz (bkz. §7).
+  /// Sembast'ta bu işlem `.transaction()` bloğu içinde yapılır —
+  /// aynı Dart process içindeki concurrent Future'lar serialize edilir
+  /// (bkz. §7 ve OQ-1 Alternatif A).
   Future<bool> tryAcquireLock(String ownerId, Duration staleLockThreshold);
 
   /// Worker kilidi tablosundaki değişiklikleri yayınlayan stream.

@@ -475,6 +475,15 @@ class QueueController {
     if (!_triggerController.isClosed) _triggerController.add(null);
   }
 
+  /// **Yalnızca test ortamında kullanın.**
+  ///
+  /// `repo.enqueue()` direkt çağrısından sonra worker döngüsünü
+  /// manuel tetikler. `controller.enqueue()` bu tetiklemeyi otomatik
+  /// yapar; ancak testler sahte dosya yolu kullandığında `enqueue()`'nun
+  /// dosya varlık kontrolünü atlamak için direkt `repo.enqueue()` tercih edilir.
+  @visibleForTesting
+  void triggerWorkerForTesting() => _triggerWorker();
+
   // ── Upload ────────────────────────────────────────────────────────────────
 
   Future<void> _uploadTask(UploadTask task) async {

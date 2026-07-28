@@ -1,9 +1,9 @@
 /// Kuyruğun anlık özeti — `watchSummary()` stream'i bu nesneyi yayınlar.
 ///
 /// Tüm `UploadStatus` sayaçlarını, duraklama bayraklarını ve tahmini disk
-/// kullanımını içerir. `watchSummary()`, Drift reactive query'sine dayandığı
-/// için `UploadTasks` tablosundaki **herhangi bir yazım** sonrası otomatik
-/// yeni bir `QueueSummary` yayınlar.
+/// kullanımını içerir. `watchSummary()`, sembast'ın `onSnapshots()` stream'ine
+/// dayandığı için `UploadTasks` store'undaki **herhangi bir yazım** sonrası
+/// otomatik yeni bir `QueueSummary` yayınlar.
 ///
 /// ## Örnek
 ///

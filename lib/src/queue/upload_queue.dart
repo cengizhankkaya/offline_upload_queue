@@ -36,7 +36,7 @@ import 'upload_queue_options.dart';
 /// final docQueue   = UploadQueue(adapter: ..., boxName: 'documents');
 /// ```
 ///
-/// Her `boxName` bağımsız bir SQLite veritabanı kullanır.
+/// Her `boxName` bağımsız bir sembast veritabanı dosyası kullanır.
 ///
 /// ## wifiOnly
 ///
@@ -73,7 +73,7 @@ class UploadQueue {
 
   /// Birden fazla bağımsız kuyruğu ayırt eden ad. Varsayılan: `'default'`.
   ///
-  /// Her `boxName` bağımsız bir SQLite veritabanı dosyası kullanır.
+  /// Her `boxName` bağımsız bir sembast veritabanı dosyası kullanır.
   final String boxName;
 
   /// `true` ise dosyanın SHA-256 checksum'ı kuyruğa eklendiği anda (enqueue)
@@ -111,11 +111,16 @@ class UploadQueue {
   /// Çoğu kullanıcının bu parametreye dokunmasına gerek yoktur.
   final UploadQueueAdvancedOptions advanced;
 
-  /// Veritabanı dosyasının (SQLCipher) tamamen şifrelenmesi için anahtar.
-  /// (Opsiyonel offline_upload_queue_sqlcipher paketini kullanmayı gerektirebilir).
+  /// Sembast veritabanı dosyasını şifrelemek için anahtar (opsiyonel).
+  ///
+  /// **Uyarı:** Kullanılan codec (Salsa20+SHA256) sembast kaynak deposundaki
+  /// örnek bir implementasyondur — bağımsız güvenlik denetiminden geçmemiştir.
+  /// HIPAA, GDPR veya compliance gerektiren projeler için bağımsız denetlenmiş
+  /// bir şifreleme çözümü kullanın.
   final String? encryptionKey;
 
-  /// Yalnızca metadata alanındaki JSON verisini şifrelemek için codec (SQLCipher kullanılmıyorsa).
+  /// Yalnızca metadata alanındaki JSON verisini özelleşmiş codec ile
+  /// encode/decode etmek için opsiyonel codec.
   final MetadataCodec? metadataCodec;
 
   UploadQueue({
