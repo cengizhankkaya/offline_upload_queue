@@ -1,3 +1,21 @@
+## 0.5.0
+
+### Breaking Changes
+- **Persistence backend değişti:** SQLite/Drift'ten sembast'a geçildi.
+  - Native binary bağımlılığı (`sqlite3_flutter_libs`) kaldırıldı — pure-Dart backend.
+  - `drift` ve `sqlite3_flutter_libs` bağımlılıkları kaldırıldı.
+  - `build_runner` / `drift_dev` artık gerekmiyor — codegen adımı yok.
+  - `database.dart` ve `tables.dart` public export'tan kaldırıldı;
+    `SembastPersistenceRepository` export edildi (ileri düzey kullanım için).
+- `PersistenceRepository` interface'i değişmedi — özel implementasyonlar etkilenmez.
+
+### Encryption (Uyarı ile)
+- `encryptionKey` parametresi artık sembast'ın codec mekanizmasına bağlı.
+  **Önemli:** Kullanılan codec (Salsa20+SHA256), sembast kaynak deposundaki
+  örnek bir implementasyondur ve bağımsız güvenlik denetiminden geçmemiştir.
+  Compliance gerektiren kullanım senaryoları için bağımsız denetlenmiş
+  bir şifreleme çözümü tercih edin.
+
 ## 0.4.0
 
 ### Security

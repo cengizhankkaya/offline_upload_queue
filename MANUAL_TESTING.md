@@ -95,5 +95,36 @@ Gözlem:
 
 ---
 
+## 5. Sembast Bellek Profili (1000+ Görev)
+
+- [ ] `UploadQueue`'ya art arda (for döngüsüyle) 1000 adet `pending` görev ekle
+- [ ] Uygulamayı kapatıp aç (cold start)
+- [ ] Açılışta (`init()` sonrası) bellek tüketimini gözlemle (Flutter DevTools → Memory)
+- [ ] Bellek kullanımının (RSS) makul seviyelerde kaldığını doğrula (sembast tüm veriyi belleğe yükler)
+
+```
+SONUÇ:
+Tarih:
+Cihaz:
+1000 görev ekleme süresi:
+Açılışta max bellek kullanımı (MB):
+```
+
+---
+
+## 6. Sembast El Değiştirme (Handoff) Testi
+
+- [ ] Arka plan görevi çalışırken ana `UploadQueue` dispose edilip yeniden başlatıldığında (`init`), veritabanı kilitlenmesi veya erişim hatası yaşanmadığını doğrula.
+- [ ] Sembast transaction'larının arka plan ve ön plan arasında hatasız devredildiğini teyit et.
+
+```
+SONUÇ:
+Tarih:
+Cihaz:
+Durum (Başarılı/Hata):
+```
+
+---
+
 *Bu dosya `docs/` altına alınmamıştır — proje köküne bilerek yerleştirildi, çünkü
 CI ve PR süreçlerinde görünür olması gerekir.*

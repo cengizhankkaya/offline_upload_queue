@@ -28,6 +28,5 @@ export 'src/queue/upload_queue_options.dart'
 export 'src/queue/retry_policy.dart' show BackoffStrategy, RetryPolicy;
 
 // ── Veritabanı (isteğe bağlı — ileri düzey kullanım için) ────────────────────
-export 'src/database/database.dart';
-export 'src/database/tables.dart';
 export 'src/database/persistence_repository.dart';
+export 'src/database/sembast_persistence_repository.dart';

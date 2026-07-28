@@ -1,6 +1,6 @@
 /// Upload durumu ve hata tipi enum'ları.
 ///
-/// ⚠️ **Kritik:** Drift `intEnum<T>()` ile integer olarak veritabanına
+/// ⚠️ **Kritik:** Sembast'ta integer (index) olarak veritabanına
 /// kaydedilir. Mevcut değerlerin sırası kesinlikle değiştirilmemeli;
 /// yeni değerler yalnızca **sona** eklenmeli. Aksi hâlde var olan
 /// kayıtların anlamı kayar ve sessiz veri bozulması oluşur.

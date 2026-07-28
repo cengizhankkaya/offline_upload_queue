@@ -1,5 +1,4 @@
-import '../database/database.dart';
-import '../database/drift_persistence_repository.dart';
+import '../database/sembast_persistence_repository.dart';
 import '../models/metadata_codec.dart';
 import '../models/queue_summary.dart';
 import '../models/upload_status.dart';
@@ -160,8 +159,11 @@ class UploadQueue {
 
     final effectiveMonitor =
         connectivityMonitor ?? DefaultConnectivityMonitor();
-    final db = QueueDatabase(encryptionKey: encryptionKey);
-    final repo = DriftPersistenceRepository(db, metadataCodec: metadataCodec);
+    final repo = SembastPersistenceRepository(
+      boxName: boxName,
+      encryptionKey: encryptionKey,
+      metadataCodec: metadataCodec,
+    );
 
     _controller = QueueController(
       repository: repo,

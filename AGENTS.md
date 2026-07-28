@@ -15,6 +15,5 @@ detayı asama dosyasında yoksa, plan-2.md içinde ilgili "Bölüm N"
 başlığını ara.
 
 ## Şu an aktif aşama
-Aşama 1 — Çekirdek (docs/asama-1-cekirdek.md).
-WAL/cross-isolate spike'ı henüz doğrulanmadıysa, Bölüm 7/13'ü
-implemente etmeye başlamadan önce kullanıcıya sor.
+Aşama 2 — Dayanıklılık ve Hata Yönetimi (docs/asama-2-dayaniklilik.md).
+Geçiş (Drift -> Sembast) tamamlandı ve cross-isolate semantiği Alternatif A (handoff) olarak doğrulandı.

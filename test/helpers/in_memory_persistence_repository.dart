@@ -233,10 +233,19 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
     bool isPaused = false,
     bool pausedDueToAuth = false,
   }) {
-    return _changeNotifier.stream.map(
-      (_) =>
-          _buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth),
-    );
+    QueueSummary current() => _buildSummary(
+        isPaused: isPaused, pausedDueToAuth: pausedDueToAuth);
+
+    late StreamSubscription<void> sub;
+    final controller = StreamController<QueueSummary>.broadcast(sync: true);
+    controller.onListen = () {
+      controller.add(current());
+      sub = _changeNotifier.stream.listen((_) {
+        if (!controller.isClosed) controller.add(current());
+      });
+    };
+    controller.onCancel = () => sub.cancel();
+    return controller.stream;
   }
 
   QueueSummary _buildSummary({
@@ -290,7 +299,7 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
     int limit = 50,
     int offset = 0,
   }) {
-    return _changeNotifier.stream.map((_) {
+    List<UploadTask> current() {
       var list = _tasks.values.toList()
         ..sort((a, b) {
           final cmp = b.priority.compareTo(a.priority);
@@ -301,7 +310,18 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
         list = list.where((t) => statuses.contains(t.status)).toList();
       }
       return list.skip(offset).take(limit).toList();
-    });
+    }
+
+    late StreamSubscription<void> sub;
+    final controller = StreamController<List<UploadTask>>(sync: true);
+    controller.onListen = () {
+      controller.add(current());
+      sub = _changeNotifier.stream.listen((_) {
+        if (!controller.isClosed) controller.add(current());
+      });
+    };
+    controller.onCancel = () => sub.cancel();
+    return controller.stream;
   }
 
   @override

@@ -9,7 +9,7 @@
 [![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-blue.svg)](https://pub.dev/packages/offline_upload_queue)
 
 Uploads survive app restarts, network interruptions, and background termination.
-Built on **SQLite/Drift** for durability, **Dio** for networking, and **BGTaskScheduler / Workmanager** for background sync.
+Built on **sembast** for pure-Dart durability, **Dio** for networking, and **BGTaskScheduler / Workmanager** for background sync.
 
 ---
 
@@ -22,7 +22,7 @@ Built on **SQLite/Drift** for durability, **Dio** for networking, and **BGTaskSc
 
 ## Features
 
-- 📦 **Persistent queue** — SQLite-backed; tasks survive process kills and reboots
+- 📦 **Persistent queue** — Sembast-backed pure-Dart DB; tasks survive process kills and reboots
 - 🔁 **Automatic retry** with exponential backoff + jitter (configurable attempts & strategy)
 - 📶 **Wi-Fi only mode** + `forceUploadOnce()` for on-demand cellular override
 - 🔄 **Reactive streams** — `watchSummary()` / `watchTasks()` / `watchProgress()`
@@ -32,7 +32,7 @@ Built on **SQLite/Drift** for durability, **Dio** for networking, and **BGTaskSc
 - 🔌 **Pluggable adapter** — bring your own `UploadAdapter` implementation
 - 🔑 **Token refresh** — `onAuthExpired` callback for seamless 401/403 recovery
 - 📋 **Structured logging** — `onLog` hook for routing events to Sentry / Crashlytics
-- 🗂️ **Multiple queues** — independent SQLite databases per `boxName`
+- 🗂️ **Multiple queues** — independent Sembast databases per `boxName`
 
 ---
 
@@ -311,7 +311,7 @@ final photoQueue = UploadQueue(adapter: ..., boxName: 'photos');
 final docQueue   = UploadQueue(adapter: ..., boxName: 'documents');
 ```
 
-Each `boxName` uses its own SQLite database file and worker lock.
+Each `boxName` uses its own Sembast database file.
 
 ---
 
@@ -468,7 +468,7 @@ class MockAdapter implements UploadAdapter {
   }
 }
 
-// Test QueueController directly — no real SQLite needed
+// Test QueueController directly — no real DB needed
 final controller = QueueController(
   repository: InMemoryPersistenceRepository(),
   adapter: MockAdapter(),
@@ -580,18 +580,14 @@ UploadQueue(
 ## Security / Sensitive Data
 
 > [!WARNING]
-> **No encryption is provided.** Upload queue data (file paths, metadata, task
-> status) is stored in **plaintext SQLite** on the device. If your app handles
-> sensitive personal data under GDPR/KVKK/HIPAA regulations, you must:
+> **Yerleşik encryption uyarısı:** `encryptionKey` kullanıldığında, veritabanı sembast'ın kendi deposunda yer alan **örnek bir codec (Salsa20+SHA256)** ile şifrelenir.
+> Bu codec bağımsız güvenlik denetiminden (security audit) geçmemiştir. Eğer uygulamanız GDPR/KVKK/HIPAA
+> gibi regülasyonlara tabi, hassas kişisel veriler (PII) taşıyorsa, lütfen:
 >
-> 1. **Avoid storing sensitive PII in `metadata`** — it is persisted as a plain
->    JSON string in SQLite.
-> 2. **Enable OS-level encryption** — Android File-Based Encryption (FBE) or
->    iOS Data Protection class (files encrypted at rest when device is locked).
-> 3. **Implement an encrypted `PersistenceRepository`** — the
->    [`PersistenceRepository`](lib/src/database/persistence_repository.dart)
->    abstract interface is designed to accept alternative storage backends
->    (e.g., SQLCipher-backed Drift).
+> 1. **`metadata` içine hassas veri koymayın** veya kendiniz şifreleyip koyun.
+> 2. **İşletim sistemi seviyesinde şifrelemeyi** aktif kullanın (iOS Data Protection, Android FBE).
+> 3. Veya bağımsız denetlenmiş, endüstri standardı (örn. SQLCipher) kullanan özel bir
+>    `PersistenceRepository` implementasyonu yazıp `UploadQueue`'ya verin.
 
 ---
 
