@@ -62,7 +62,8 @@ void main() {
 
       // Upload başladığında (uploading durumu) Completer'ı çöz
       repo.watchTasks(statuses: {UploadStatus.uploading}).listen((tasks) {
-        if (tasks.any((t) => t.taskId == taskId) && !uploadStarted.isCompleted) {
+        if (tasks.any((t) => t.taskId == taskId) &&
+            !uploadStarted.isCompleted) {
           uploadStarted.complete();
         }
       });
@@ -109,7 +110,8 @@ void main() {
       print('--- task enqueued ---');
 
       repo.watchTasks(statuses: {UploadStatus.uploading}).listen((tasks) {
-        if (tasks.any((t) => t.taskId == taskId) && !uploadStarted.isCompleted) {
+        if (tasks.any((t) => t.taskId == taskId) &&
+            !uploadStarted.isCompleted) {
           uploadStarted.complete();
         }
       });
@@ -152,7 +154,8 @@ void main() {
       final taskId = await controller.enqueue(filePath: fakeFilePath);
 
       repo.watchTasks(statuses: {UploadStatus.uploading}).listen((tasks) {
-        if (tasks.any((t) => t.taskId == taskId) && !uploadStarted.isCompleted) {
+        if (tasks.any((t) => t.taskId == taskId) &&
+            !uploadStarted.isCompleted) {
           uploadStarted.complete();
         }
       });
@@ -196,7 +199,8 @@ void main() {
       final taskId = await controller.enqueue(filePath: fakeFilePath);
 
       repo.watchTasks(statuses: {UploadStatus.uploading}).listen((tasks) {
-        if (tasks.any((t) => t.taskId == taskId) && !uploadStarted.isCompleted) {
+        if (tasks.any((t) => t.taskId == taskId) &&
+            !uploadStarted.isCompleted) {
           uploadStarted.complete();
         }
       });
@@ -230,17 +234,19 @@ void main() {
 
       // 10 eşzamanlı enqueue (controller üzerinden → dosya varlık kontrolü geçiyor)
       final ids = await Future.wait([
-        for (var i = 0; i < 10; i++)
-          controller.enqueue(filePath: fakeFilePath),
+        for (var i = 0; i < 10; i++) controller.enqueue(filePath: fakeFilePath),
       ]);
 
       // Tüm taskId'ler benzersiz
       expect(ids.toSet().length, 10, reason: 'TaskId\'ler benzersiz olmalı');
 
       // Tüm sequence numaraları benzersiz ve monoton
-      final seqs =
-          repo.allTasks.map((t) => t.sequenceNumber).toList()..sort();
-      expect(seqs.toSet().length, 10, reason: 'Sequence numaraları benzersiz olmalı');
+      final seqs = repo.allTasks.map((t) => t.sequenceNumber).toList()..sort();
+      expect(
+        seqs.toSet().length,
+        10,
+        reason: 'Sequence numaraları benzersiz olmalı',
+      );
       for (var i = 1; i < seqs.length; i++) {
         expect(seqs[i], greaterThan(seqs[i - 1]));
       }

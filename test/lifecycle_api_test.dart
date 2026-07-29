@@ -144,7 +144,11 @@ void main() {
         await completedCompleter.future.timeout(const Duration(seconds: 3));
 
         expect(repo.taskFor('auth-ok')?.status, UploadStatus.completed);
-        expect(authCallCount, 1, reason: 'onAuthExpired bir kez çağrılmış olmalı');
+        expect(
+          authCallCount,
+          1,
+          reason: 'onAuthExpired bir kez çağrılmış olmalı',
+        );
 
         await controller.dispose();
       },
@@ -156,7 +160,9 @@ void main() {
       () async {
         final failedCompleter = Completer<void>();
 
-        final adapter = MockUploadAdapter.alwaysFailure(FailureType.authExpired);
+        final adapter = MockUploadAdapter.alwaysFailure(
+          FailureType.authExpired,
+        );
 
         final controller = makeController(
           adapter: adapter,
@@ -188,7 +194,10 @@ void main() {
 
         // authExpired kalıcı değil → backoff ile failed
         expect(repo.taskFor('auth-timeout')?.status, UploadStatus.failed);
-        expect(repo.taskFor('auth-timeout')?.failureType, FailureType.authExpired);
+        expect(
+          repo.taskFor('auth-timeout')?.failureType,
+          FailureType.authExpired,
+        );
 
         await controller.dispose();
       },
@@ -200,7 +209,9 @@ void main() {
       () async {
         final failedCompleter = Completer<void>();
 
-        final adapter = MockUploadAdapter.alwaysFailure(FailureType.authExpired);
+        final adapter = MockUploadAdapter.alwaysFailure(
+          FailureType.authExpired,
+        );
 
         final controller = makeController(
           adapter: adapter,
@@ -233,7 +244,10 @@ void main() {
         );
 
         expect(repo.taskFor('auth-throw')?.status, UploadStatus.failed);
-        expect(repo.taskFor('auth-throw')?.failureType, FailureType.authExpired);
+        expect(
+          repo.taskFor('auth-throw')?.failureType,
+          FailureType.authExpired,
+        );
 
         await controller.dispose();
       },
@@ -307,7 +321,9 @@ void main() {
       () async {
         var authCallCount = 0;
         // Her denemede authExpired dönüyor
-        final adapter = MockUploadAdapter.alwaysFailure(FailureType.authExpired);
+        final adapter = MockUploadAdapter.alwaysFailure(
+          FailureType.authExpired,
+        );
 
         final pfCompleter = Completer<void>();
 
@@ -342,7 +358,10 @@ void main() {
         await pfCompleter.future.timeout(const Duration(seconds: 5));
 
         // maxAttempts=3 geçildikten sonra permanentlyFailed olmalı
-        expect(repo.taskFor('auth-loop')?.status, UploadStatus.permanentlyFailed);
+        expect(
+          repo.taskFor('auth-loop')?.status,
+          UploadStatus.permanentlyFailed,
+        );
         // Sonsuz döngüye girmemeli
         expect(authCallCount, lessThanOrEqualTo(3));
 
@@ -371,14 +390,8 @@ void main() {
           () => controller.enqueue(filePath: fakeFilePath),
           throwsStateError,
         );
-        await expectLater(
-          () => controller.retry('any-id'),
-          throwsStateError,
-        );
-        await expectLater(
-          () => controller.cancel('any-id'),
-          throwsStateError,
-        );
+        await expectLater(() => controller.retry('any-id'), throwsStateError);
+        await expectLater(() => controller.cancel('any-id'), throwsStateError);
       },
     );
 
@@ -473,14 +486,18 @@ void main() {
         final freshRepo = InMemoryPersistenceRepository();
 
         final received = <double>[];
-        final sub = freshRepo.watchProgress('nonexistent-task').listen(
-          received.add,
-        );
+        final sub = freshRepo
+            .watchProgress('nonexistent-task')
+            .listen(received.add);
 
         await Future.delayed(const Duration(milliseconds: 100));
         await sub.cancel();
 
-        expect(received, isEmpty, reason: 'Var olmayan task için değer yayınlanmamalı');
+        expect(
+          received,
+          isEmpty,
+          reason: 'Var olmayan task için değer yayınlanmamalı',
+        );
 
         await freshRepo.dispose();
       },

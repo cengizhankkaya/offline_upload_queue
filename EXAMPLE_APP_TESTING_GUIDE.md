@@ -83,3 +83,24 @@ Uygulama çalıştırıldığında alt kısımda 4 ana sekme bulunur:
 ### Senaryo 5.2: Tüm Görevleri Temizleme (Purge All)
 1. Listede farklı durumlarda (completed, cancelled, permanentlyFailed) birçok görev oluşturun.
 2. "Hata" sekmesindeki veya "Disk" sekmesindeki toplu silme tuşlarını kullanarak (veya test dosyasına ekleyerek) sadece belirli durumdaki görevlerin temizlendiğini (örn: sadece hataları sil) ve `pending` olanların etkilenmediğini gözlemleyin.
+
+---
+
+## 6. OS-Seviyesi Kaos ve Dayanıklılık (Faz 2)
+
+Bu senaryolar, entegrasyon testlerinin tam olarak simüle edemeyeceği, gerçek cihaz üzerinde yapılması gereken dayanıklılık testleridir.
+
+### Senaryo 6.1: Gerçek Process Kill (kill -9)
+1. **Kuyruk** sekmesinde 5-6 dosya ekleyin.
+2. İşlemler sırayla yüklenirken, uygulamayı cihazın görev yöneticisinden (Task Switcher) sert bir şekilde kapatın (force-quit / force-stop).
+3. Uygulamayı yeniden başlatın ve daha önce eklenen dosyaların kaybolmadığını, `uploading` durumunda olanın `pending` durumuna çekilerek işlemin kaldığı yerden devam ettiğini doğrulayın. *(Not: Bu durum aslında Senaryo 1.3 ile benzerdir ancak uygulamanın tam ortasında çökmesini simüle eder).*
+
+### Senaryo 6.2: Fiziksel Ağ Kopması (Uçak Modu)
+1. Yükleme devam ederken cihazı Uçak Moduna alın (veya Wi-Fi'yi kapatın).
+2. O an yüklenmekte olan görevin hata vermeden çökmediğini, yalnızca **failed** (geçici hata) durumuna düştüğünü **Debug** sekmesinden izleyin.
+3. Arka plan servisi görevleri yeniden denerken (exponential backoff) uçağı modunu kapatın ve sistem internet bağlantısını yakaladığında yüklemenin tamamlandığını doğrulayın. *(Senaryo 2.2'nin fiziksel versiyonudur).*
+
+### Senaryo 6.3: Cihaz Depolamasının Dolması (Disk Full)
+1. Cihazınızın depolama alanını geçici olarak tamamen doldurun (büyük dummy dosyalar oluşturarak).
+2. Uygulama üzerinden yeni bir dosya yüklemeyi deneyin.
+3. Sandbox kopyası alınamayacağı veya veritabanına yazılamayacağı için uygulamanın çökmediğini (crash olmadığını), `enqueue()` fonksiyonunun anlamlı bir hata fırlattığını (örneğin UI'da bir SnackBar hatası gösterildiğini veya konsola düştüğünü) doğrulayın.

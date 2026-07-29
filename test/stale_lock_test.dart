@@ -163,7 +163,9 @@ void main() {
       expect(adapter.callCount, 0);
 
       // Cleanup: controller'ı dispose et (bu da init'i çıkaracak)
-      controller.dispose().ignore(); // disposed flag'i set eder, lock while exit
+      controller
+          .dispose()
+          .ignore(); // disposed flag'i set eder, lock while exit
       await initFuture.timeout(
         const Duration(seconds: 2),
         onTimeout: () {}, // timeout normal
@@ -201,7 +203,11 @@ void main() {
       // Kısa bekleme — task yoksa getNextPending() null döner, crash yok
       await Future.delayed(const Duration(milliseconds: 100));
 
-      expect(repo.taskFor('ghost-task'), isNull, reason: 'Task silinmiş olmalı');
+      expect(
+        repo.taskFor('ghost-task'),
+        isNull,
+        reason: 'Task silinmiş olmalı',
+      );
       expect(
         adapter.callCount,
         0,

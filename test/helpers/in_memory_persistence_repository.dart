@@ -237,10 +237,14 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
     late StreamSubscription<void> sub;
     final controller = StreamController<QueueSummary>(sync: true);
     controller.onListen = () {
-      controller.add(_buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth));
+      controller.add(
+        _buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth),
+      );
       sub = _changeNotifier.stream.listen((_) {
         if (!controller.isClosed) {
-          controller.add(_buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth));
+          controller.add(
+            _buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth),
+          );
         }
       });
     };

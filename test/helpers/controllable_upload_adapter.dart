@@ -53,8 +53,7 @@ class ControllableUploadAdapter implements UploadAdapter {
   }
 
   /// Bekleyen herhangi bir upload var mı?
-  bool get hasWaiting =>
-      _pauseCompleters.values.any((c) => !c.isCompleted);
+  bool get hasWaiting => _pauseCompleters.values.any((c) => !c.isCompleted);
 
   /// Toplam adapter çağrı sayısı.
   int get callCount => startedTaskIds.length;

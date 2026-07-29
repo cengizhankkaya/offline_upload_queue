@@ -48,8 +48,8 @@ class _EncryptCodec extends Codec<Object?, String> {
   final _EncryptDecoder _decoder;
 
   _EncryptCodec(String password)
-      : _encoder = _EncryptEncoder(_getSalsa20(password)),
-        _decoder = _EncryptDecoder(_getSalsa20(password));
+    : _encoder = _EncryptEncoder(_getSalsa20(password)),
+      _decoder = _EncryptDecoder(_getSalsa20(password));
 
   @override
   Converter<String, Object?> get decoder => _decoder;
@@ -68,8 +68,5 @@ class _EncryptCodec extends Codec<Object?, String> {
 ///
 /// **UYARI:** Bu codec bağımsız güvenlik denetiminden geçmemiştir.
 SembastCodec getEncryptSembastCodec({required String password}) {
-  return SembastCodec(
-    signature: 'salsa20',
-    codec: _EncryptCodec(password),
-  );
+  return SembastCodec(signature: 'salsa20', codec: _EncryptCodec(password));
 }

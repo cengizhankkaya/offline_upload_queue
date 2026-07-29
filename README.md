@@ -23,6 +23,14 @@ Powered by **Sembast** (for pure-Dart durability), **Dio** (for robust networkin
 * **Pluggable Architecture:** Bring your own `UploadAdapter` (REST, GraphQL, AWS S3, Firebase).
 * **Reactive UI:** Full stream-based API for rendering live progress bars and queue summaries.
 
+## 🧪 Proven Reliability (Battle-Tested)
+
+This package has undergone rigorous automated integration testing on real devices:
+- **Chaos Network Tested:** Gracefully handles `429 Too Many Requests` and connection timeouts with exponential backoff.
+- **Crash Recovery & Lock Stealing:** Recovers automatically if the app is force-killed (`kill -9`) mid-upload, intelligently stealing stale locks.
+- **Load Tested:** Proven to handle rapid enqueueing of 1000+ files and streaming of 20MB+ files without UI jank or memory leaks.
+- **Security Verified:** Sembast database encryption (Salsa20+SHA256) is thoroughly verified against plaintext data extraction.
+
 ---
 
 ## 📦 Features

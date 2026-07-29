@@ -20,7 +20,7 @@ class ErrorScreen extends StatelessWidget {
 
   Future<void> _enqueueNonExistent(BuildContext context) async {
     // QueueController.enqueue dosyanın gerçekten var olmasını bekler.
-    // Bu yüzden geçici bir dosya yaratıp kuyruğa ekliyoruz. MockUploadAdapter 
+    // Bu yüzden geçici bir dosya yaratıp kuyruğa ekliyoruz. MockUploadAdapter
     // metadata'daki 'demo': 'error_case' değerini görüp fileNotFound hatası dönecek.
     final tempDir = await getTemporaryDirectory();
     final bogusFile = File('${tempDir.path}/dummy_error_file.jpg');

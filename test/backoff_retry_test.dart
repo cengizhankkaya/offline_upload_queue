@@ -117,67 +117,59 @@ void main() {
     );
 
     // ── §1.3 ─────────────────────────────────────────────────────────────────
-    test(
-      '1.3 Jitter: tekrarlanan compute() çağrıları farklı süreler üretir',
-      () {
-        final policy = RetryPolicy(
-          maxAttempts: 6,
-          backoff: BackoffStrategy.exponential(
-            base: const Duration(seconds: 2),
-            max: const Duration(minutes: 10),
-          ),
-        );
-        final now = DateTime(2024, 1, 1);
+    test('1.3 Jitter: tekrarlanan compute() çağrıları farklı süreler üretir', () {
+      final policy = RetryPolicy(
+        maxAttempts: 6,
+        backoff: BackoffStrategy.exponential(
+          base: const Duration(seconds: 2),
+          max: const Duration(minutes: 10),
+        ),
+      );
+      final now = DateTime(2024, 1, 1);
 
-        // 50 çağrıda en az 2 farklı sonuç olmalı → jitter var
-        final results =
-            List.generate(50, (_) {
-              return policy
-                  .nextRetryAt(
-                    retryCount: 0,
-                    failureType: FailureType.network,
-                    from: now,
-                  )!
-                  .difference(now)
-                  .inMilliseconds;
-            }).toSet();
+      // 50 çağrıda en az 2 farklı sonuç olmalı → jitter var
+      final results = List.generate(50, (_) {
+        return policy
+            .nextRetryAt(
+              retryCount: 0,
+              failureType: FailureType.network,
+              from: now,
+            )!
+            .difference(now)
+            .inMilliseconds;
+      }).toSet();
 
-        expect(
-          results.length,
-          greaterThan(1),
-          reason:
-              'Jitter olmadan tüm değerler aynı olur; farklı değerler bekleniyor',
-        );
-      },
-    );
+      expect(
+        results.length,
+        greaterThan(1),
+        reason:
+            'Jitter olmadan tüm değerler aynı olur; farklı değerler bekleniyor',
+      );
+    });
 
     // ── §1.4 ─────────────────────────────────────────────────────────────────
-    test(
-      '1.4 FixedBackoff: her retryCount için aynı süre döner',
-      () {
-        const fixedDuration = Duration(seconds: 7);
-        final policy = RetryPolicy(
-          maxAttempts: 6,
-          backoff: BackoffStrategy.fixed(fixedDuration),
-        );
-        final now = DateTime(2024, 1, 1);
+    test('1.4 FixedBackoff: her retryCount için aynı süre döner', () {
+      const fixedDuration = Duration(seconds: 7);
+      final policy = RetryPolicy(
+        maxAttempts: 6,
+        backoff: BackoffStrategy.fixed(fixedDuration),
+      );
+      final now = DateTime(2024, 1, 1);
 
-        final results =
-            List.generate(10, (i) {
-              return policy
-                  .nextRetryAt(
-                    retryCount: i,
-                    failureType: FailureType.network,
-                    from: now,
-                  )!
-                  .difference(now)
-                  .inMilliseconds;
-            }).toSet();
+      final results = List.generate(10, (i) {
+        return policy
+            .nextRetryAt(
+              retryCount: i,
+              failureType: FailureType.network,
+              from: now,
+            )!
+            .difference(now)
+            .inMilliseconds;
+      }).toSet();
 
-        // Tüm sonuçlar aynı olmalı (7000 ms)
-        expect(results, equals({fixedDuration.inMilliseconds}));
-      },
-    );
+      // Tüm sonuçlar aynı olmalı (7000 ms)
+      expect(results, equals({fixedDuration.inMilliseconds}));
+    });
 
     // ── §1.6 ─────────────────────────────────────────────────────────────────
     test(
@@ -205,7 +197,11 @@ void main() {
         await repo.markPending('task-a');
 
         final task = await repo.getNextPending(DateTime.now());
-        expect(task?.taskId, 'task-a', reason: 'Eski task (seq=1) önce alınmalı');
+        expect(
+          task?.taskId,
+          'task-a',
+          reason: 'Eski task (seq=1) önce alınmalı',
+        );
       },
     );
 
@@ -228,13 +224,10 @@ void main() {
           sequenceNumber: 1,
         );
         await repo.markCancelled('cancelled-retry');
-        
+
         await controller.init();
 
-        expect(
-          repo.taskFor('cancelled-retry')?.status,
-          UploadStatus.cancelled,
-        );
+        expect(repo.taskFor('cancelled-retry')?.status, UploadStatus.cancelled);
 
         repo.watchTasks(statuses: {UploadStatus.completed}).listen((tasks) {
           if (tasks.any((t) => t.taskId == 'cancelled-retry') &&
@@ -246,10 +239,7 @@ void main() {
         await controller.retry('cancelled-retry');
         await completedCompleter.future.timeout(const Duration(seconds: 2));
 
-        expect(
-          repo.taskFor('cancelled-retry')?.status,
-          UploadStatus.completed,
-        );
+        expect(repo.taskFor('cancelled-retry')?.status, UploadStatus.completed);
 
         await controller.dispose();
       },
@@ -286,8 +276,7 @@ void main() {
         controller.triggerWorkerForTesting();
         await failedCompleter.future.timeout(const Duration(seconds: 2));
 
-        final nextRetryBefore =
-            repo.taskFor('backoff-pause')!.nextRetryAt;
+        final nextRetryBefore = repo.taskFor('backoff-pause')!.nextRetryAt;
         expect(nextRetryBefore, isNotNull);
 
         // pause() → resume() → nextRetryAt değişmemeli, task işlenmemeli
@@ -296,7 +285,11 @@ void main() {
         await Future.delayed(const Duration(milliseconds: 100));
 
         final taskAfter = repo.taskFor('backoff-pause')!;
-        expect(taskAfter.status, UploadStatus.failed, reason: 'Backoff devam ediyor');
+        expect(
+          taskAfter.status,
+          UploadStatus.failed,
+          reason: 'Backoff devam ediyor',
+        );
         expect(
           taskAfter.nextRetryAt,
           equals(nextRetryBefore),
@@ -362,51 +355,48 @@ void main() {
     );
 
     // ── §4.13 ────────────────────────────────────────────────────────────────
-    test(
-      '4.13 permanentlyFailed → otomatik retry denenmez',
-      () async {
-        final adapter = MockUploadAdapter.alwaysFailure(FailureType.fileNotFound);
-        final pfCompleter = Completer<void>();
+    test('4.13 permanentlyFailed → otomatik retry denenmez', () async {
+      final adapter = MockUploadAdapter.alwaysFailure(FailureType.fileNotFound);
+      final pfCompleter = Completer<void>();
 
-        final controller = makeController(
-          adapter: adapter,
-          monitor: monitor,
-          repo: repo,
-          maxAttempts: 6,
-        );
-        await controller.init();
+      final controller = makeController(
+        adapter: adapter,
+        monitor: monitor,
+        repo: repo,
+        maxAttempts: 6,
+      );
+      await controller.init();
 
-        await repo.enqueue(
-          taskId: 'pf-no-auto',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
-        repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
-          tasks,
-        ) {
-          if (tasks.any((t) => t.taskId == 'pf-no-auto') &&
-              !pfCompleter.isCompleted) {
-            pfCompleter.complete();
-          }
-        });
-        controller.triggerWorkerForTesting();
-        await pfCompleter.future.timeout(const Duration(seconds: 2));
+      await repo.enqueue(
+        taskId: 'pf-no-auto',
+        filePath: fakeFilePath,
+        sequenceNumber: 1,
+      );
+      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
+        tasks,
+      ) {
+        if (tasks.any((t) => t.taskId == 'pf-no-auto') &&
+            !pfCompleter.isCompleted) {
+          pfCompleter.complete();
+        }
+      });
+      controller.triggerWorkerForTesting();
+      await pfCompleter.future.timeout(const Duration(seconds: 2));
 
-        final callCountAtFail = adapter.callCount;
+      final callCountAtFail = adapter.callCount;
 
-        // Ek bekleme süresi — otomatik retry olsaydı callCount artardı
-        await Future.delayed(const Duration(milliseconds: 300));
+      // Ek bekleme süresi — otomatik retry olsaydı callCount artardı
+      await Future.delayed(const Duration(milliseconds: 300));
 
-        expect(
-          adapter.callCount,
-          callCountAtFail,
-          reason: 'permanentlyFailed sonrası otomatik retry denenmemeli',
-        );
-        expect(adapter.callCount, 1, reason: 'Kalıcı hata → yalnızca 1 deneme');
+      expect(
+        adapter.callCount,
+        callCountAtFail,
+        reason: 'permanentlyFailed sonrası otomatik retry denenmemeli',
+      );
+      expect(adapter.callCount, 1, reason: 'Kalıcı hata → yalnızca 1 deneme');
 
-        await controller.dispose();
-      },
-    );
+      await controller.dispose();
+    });
 
     // ── §4 Sınır Testleri ─────────────────────────────────────────────────────
     test(

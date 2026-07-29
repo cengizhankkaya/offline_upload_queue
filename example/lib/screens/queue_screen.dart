@@ -30,7 +30,7 @@ class QueueScreen extends StatelessWidget {
         .toList();
 
     await uploadQueue.enqueueBatch(items);
-    
+
     // Arka plan işleyicisini (Workmanager) uyar
     try {
       await AndroidBackgroundRunner.scheduleNextRun();

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
 
 import 'package:offline_upload_queue/offline_upload_queue.dart';
 
@@ -7,6 +9,7 @@ import 'screens/queue_screen.dart';
 import 'screens/cellular_screen.dart';
 import 'screens/error_screen.dart';
 import 'screens/disk_screen.dart';
+import 'screens/debug_screen.dart';
 
 /// Demo adapter — yanıt vermiyor ama API'yi göstermek için yeterli.
 ///
@@ -37,6 +40,53 @@ class MockUploadAdapter implements UploadAdapter {
   }
 }
 
+class ExampleRestAdapter implements UploadAdapter {
+  // TODO: Update this to your development machine's local IP address
+  // For Android Emulator, use 10.0.2.2. For iOS Simulator, use localhost.
+  final String baseUrl = 'http://10.0.2.2:8080';
+
+  @override
+  Future<UploadResult> uploadFile({
+    required String taskId,
+    required String filePath,
+    required Map<String, dynamic> metadata,
+    required String checksum,
+    void Function(int sent, int total)? onProgress,
+    UploadCancelToken? cancelToken,
+  }) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        return const UploadResult.failure(FailureType.fileNotFound);
+      }
+
+      String endpoint = '/upload';
+      if (metadata['demo'] == 'error_case') endpoint = '/upload_error';
+      if (metadata['demo'] == 'timeout_case') endpoint = '/upload_timeout';
+      if (metadata['demo'] == '429_case') endpoint = '/upload_429';
+
+      final uri = Uri.parse('$baseUrl$endpoint');
+      final request = http.MultipartRequest('POST', uri)
+        ..files.add(await http.MultipartFile.fromPath('file', filePath));
+
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 5),
+      );
+      if (cancelToken?.isCancelled ?? false) {
+        return const UploadResult.failure(FailureType.unknown);
+      }
+
+      if (streamedResponse.statusCode == 200) {
+        return const UploadResult.success();
+      } else {
+        return const UploadResult.failure(FailureType.serverError);
+      }
+    } catch (e) {
+      return const UploadResult.failure(FailureType.network);
+    }
+  }
+}
+
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((taskName, inputData) async {
@@ -51,20 +101,29 @@ void callbackDispatcher() {
   });
 }
 
-/// Uygulama genelinde paylaşılan tek UploadQueue örneği.
 final uploadQueue = UploadQueue(
-  adapter: MockUploadAdapter(),
+  adapter:
+      ExampleRestAdapter(), // Using real network adapter to talk to mock server
   wifiOnly: false,
   maxAttempts: 4,
   advanced: UploadQueueAdvancedOptions(
     diskUsageWarningBytes: 50 * 1024 * 1024, // 50 MB
     onDiskUsageWarning: (current, limit) {
-      debugPrint('⚠️ Disk uyarısı: $current / $limit byte');
+      final msg = '⚠️ Disk uyarısı: $current / $limit byte';
+      debugPrint(msg);
+      globalLogsNotifier.value = [
+        ...globalLogsNotifier.value,
+        '[WARNING] $msg',
+      ];
     },
     onLog: (message, {required level}) {
       if (level == LogLevel.warning || level == LogLevel.error) {
         debugPrint('[${level.name.toUpperCase()}] $message');
       }
+      globalLogsNotifier.value = [
+        ...globalLogsNotifier.value,
+        '[${level.name.toUpperCase()}] $message',
+      ];
     },
     heartbeatInterval: const Duration(seconds: 5),
     staleLockThreshold: const Duration(seconds: 15),
@@ -119,11 +178,12 @@ class _MainShellState extends State<MainShell> {
     _initFuture = uploadQueue.init();
   }
 
-  static const _screens = [
-    QueueScreen(),
-    CellularScreen(),
-    ErrorScreen(),
-    DiskScreen(),
+  late final _screens = [
+    const QueueScreen(),
+    const CellularScreen(),
+    const ErrorScreen(),
+    const DiskScreen(),
+    DebugScreen(uploadQueue: uploadQueue),
   ];
 
   @override
@@ -173,6 +233,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.storage_outlined),
             selectedIcon: Icon(Icons.storage),
             label: 'Disk',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bug_report_outlined),
+            selectedIcon: Icon(Icons.bug_report),
+            label: 'Debug',
           ),
         ],
       ),

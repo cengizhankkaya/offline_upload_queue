@@ -238,7 +238,8 @@ void main() {
         filePath: fakeFilePath,
         sequenceNumber: 1,
       );
-      controller.triggerWorkerForTesting(); // wifiOnly+cellular → pending kalmalı
+      controller
+          .triggerWorkerForTesting(); // wifiOnly+cellular → pending kalmalı
       await Future.delayed(const Duration(milliseconds: 100));
 
       expect(repo.taskFor('task-1')?.status, UploadStatus.pending);
@@ -291,7 +292,7 @@ void main() {
         sequenceNumber: 3,
       );
       controller.triggerWorkerForTesting(); // pause aktif → işlenmemeli
-      await controller.forceUploadOnce();  // pause aktif → return yapar
+      await controller.forceUploadOnce(); // pause aktif → return yapar
       await Future.delayed(const Duration(milliseconds: 100));
 
       expect(repo.taskFor('task-3')?.status, UploadStatus.pending);
@@ -321,7 +322,8 @@ void main() {
           completer.complete();
         }
       });
-      controller.triggerWorkerForTesting(); // repo.enqueue() sonrası worker'a haber ver
+      controller
+          .triggerWorkerForTesting(); // repo.enqueue() sonrası worker'a haber ver
 
       await completer.future.timeout(const Duration(seconds: 2));
       expect(repo.taskFor('task-4')?.status, UploadStatus.permanentlyFailed);
@@ -448,47 +450,44 @@ void main() {
       expect(all.any((t) => t.taskId == 'task-9b'), isTrue);
     });
 
-    test(
-      'diskUsageWarning eşiği aşılınca onDiskUsageWarning çağrılır',
-      () async {
-        int? capturedCurrent;
-        int? capturedWarning;
+    test('diskUsageWarning eşiği aşılınca onDiskUsageWarning çağrılır', () async {
+      int? capturedCurrent;
+      int? capturedWarning;
 
-        final advanced = UploadQueueAdvancedOptions(
-          heartbeatInterval: const Duration(milliseconds: 50),
-          staleLockThreshold: const Duration(milliseconds: 200),
-          diskUsageWarningBytes: 100,
-          onDiskUsageWarning: (current, warning) {
-            capturedCurrent = current;
-            capturedWarning = warning;
-          },
-        );
+      final advanced = UploadQueueAdvancedOptions(
+        heartbeatInterval: const Duration(milliseconds: 50),
+        staleLockThreshold: const Duration(milliseconds: 200),
+        diskUsageWarningBytes: 100,
+        onDiskUsageWarning: (current, warning) {
+          capturedCurrent = current;
+          capturedWarning = warning;
+        },
+      );
 
-        final controller = makeController(
-          adapter: MockUploadAdapter.alwaysSuccess(),
-          monitor: monitor,
-          repo: repo,
-          advanced: advanced,
-        );
-        await controller.init();
-        controller.pause();
+      final controller = makeController(
+        adapter: MockUploadAdapter.alwaysSuccess(),
+        monitor: monitor,
+        repo: repo,
+        advanced: advanced,
+      );
+      await controller.init();
+      controller.pause();
 
-        await repo.enqueue(
-          taskId: 'task-10',
-          filePath: fakeFilePath,
-          sequenceNumber: 12,
-          fileSizeBytes: 200,
-        );
-        // Heartbeat timer 50ms aralıkla çalışır; 300ms bekleyerek en az 2 heartbeat
-        // tetiklenmiş olmasını sağlıyoruz.
-        await Future.delayed(const Duration(milliseconds: 300));
+      await repo.enqueue(
+        taskId: 'task-10',
+        filePath: fakeFilePath,
+        sequenceNumber: 12,
+        fileSizeBytes: 200,
+      );
+      // Heartbeat timer 50ms aralıkla çalışır; 300ms bekleyerek en az 2 heartbeat
+      // tetiklenmiş olmasını sağlıyoruz.
+      await Future.delayed(const Duration(milliseconds: 300));
 
-        expect(capturedCurrent, isNotNull);
-        expect(capturedCurrent, greaterThan(100));
-        expect(capturedWarning, 100);
-        await controller.dispose();
-      },
-    );
+      expect(capturedCurrent, isNotNull);
+      expect(capturedCurrent, greaterThan(100));
+      expect(capturedWarning, 100);
+      await controller.dispose();
+    });
 
     test('onLog null bırakılınca hiçbir exception fırlatılmaz', () async {
       final controller = makeController(
@@ -667,7 +666,6 @@ void main() {
       });
       controller.triggerWorkerForTesting();
       await permanentCompleter.future.timeout(const Duration(seconds: 2));
-
 
       repo.watchTasks(statuses: {UploadStatus.completed}).listen((tasks) {
         if (tasks.any((t) => t.taskId == 'retry-1') &&

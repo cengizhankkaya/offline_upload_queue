@@ -491,7 +491,9 @@ class QueueController {
     await _repo.markUploading(task.taskId);
 
     if (_disposed) {
-      try { await _repo.markPending(task.taskId); } catch (_) {}
+      try {
+        await _repo.markPending(task.taskId);
+      } catch (_) {}
       return;
     }
 
@@ -528,7 +530,6 @@ class QueueController {
           }
         }
       } else {
-        
         _log(
           'Dosya okunamıyor, corruptFile olarak işaretleniyor: ${task.taskId}',
           level: LogLevel.warning,
@@ -543,14 +544,18 @@ class QueueController {
     }
 
     if (_disposed) {
-      try { await _repo.markPending(task.taskId); } catch (_) {}
+      try {
+        await _repo.markPending(task.taskId);
+      } catch (_) {}
       return;
     }
 
     await _repo.updateChecksum(task.taskId, checksum);
 
     if (_disposed) {
-      try { await _repo.markPending(task.taskId); } catch (_) {}
+      try {
+        await _repo.markPending(task.taskId);
+      } catch (_) {}
       return;
     }
 
@@ -588,7 +593,9 @@ class QueueController {
       if (cancelToken.isCancelled) {
         _activeTokens.remove(task.taskId);
         if (_disposed) {
-          try { await _repo.markPending(task.taskId); } catch (_) {}
+          try {
+            await _repo.markPending(task.taskId);
+          } catch (_) {}
         }
         return;
       }
@@ -680,7 +687,9 @@ class QueueController {
         await _repo.markFailed(
           task.taskId,
           failureType: failureType,
-          nextRetryAt: DateTime.now().subtract(const Duration(seconds: 1)), // Hemen alınsın, isBefore(now) true olsun
+          nextRetryAt: DateTime.now().subtract(
+            const Duration(seconds: 1),
+          ), // Hemen alınsın, isBefore(now) true olsun
         );
         _triggerWorker();
         return;
@@ -782,8 +791,6 @@ class QueueController {
       timer.cancel();
     }
     _backoffTimers.clear();
-
-
 
     // Worker trigger stream'ini kapat
     await _triggerController.close();

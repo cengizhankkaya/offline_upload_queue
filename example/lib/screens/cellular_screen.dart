@@ -143,8 +143,9 @@ class _CellularScreenState extends State<CellularScreen> {
                         ),
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: theme.colorScheme.outline
-                                .withValues(alpha: 0.4),
+                            color: theme.colorScheme.outline.withValues(
+                              alpha: 0.4,
+                            ),
                           ),
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -153,8 +154,10 @@ class _CellularScreenState extends State<CellularScreen> {
                           children: [
                             _Info('Bekliyor', s.pending.toString()),
                             _Info('Tamamlandı', s.completed.toString()),
-                            _Info('Duraklatıldı',
-                                s.isPaused ? 'Evet' : 'Hayır'),
+                            _Info(
+                              'Duraklatıldı',
+                              s.isPaused ? 'Evet' : 'Hayır',
+                            ),
                           ],
                         ),
                       );

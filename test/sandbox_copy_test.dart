@@ -163,10 +163,15 @@ void main() {
       final sandboxFile = File('${sandboxDir.path}/$taskId.txt');
 
       // Enqueue anında sandbox kopyası oluşmuş olmalı
-      expect(sandboxFile.existsSync(), isTrue, reason: 'Sandbox kopyası oluşmalı');
+      expect(
+        sandboxFile.existsSync(),
+        isTrue,
+        reason: 'Sandbox kopyası oluşmalı',
+      );
 
       repo.watchTasks(statuses: {UploadStatus.completed}).listen((tasks) {
-        if (tasks.any((t) => t.taskId == taskId) && !completedCompleter.isCompleted) {
+        if (tasks.any((t) => t.taskId == taskId) &&
+            !completedCompleter.isCompleted) {
           completedCompleter.complete();
         }
       });
@@ -231,7 +236,9 @@ void main() {
       final sandboxFile = File('${sandboxDir.path}/$taskId.txt');
       expect(sandboxFile.existsSync(), isTrue);
 
-      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((tasks) {
+      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
+        tasks,
+      ) {
         if (tasks.any((t) => t.taskId == taskId) && !pfCompleter.isCompleted) {
           pfCompleter.complete();
         }
@@ -292,7 +299,9 @@ void main() {
       // Upload başlamadan önce orijinal dosyayı sil
       await sourceFile.delete();
 
-      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((tasks) {
+      repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
+        tasks,
+      ) {
         if (tasks.any((t) => t.taskId == taskId) && !pfCompleter.isCompleted) {
           pfCompleter.complete();
         }
@@ -318,4 +327,3 @@ void main() {
     },
   );
 }
-
