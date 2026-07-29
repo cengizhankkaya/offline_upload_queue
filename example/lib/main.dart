@@ -40,6 +40,7 @@ class MockUploadAdapter implements UploadAdapter {
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((taskName, inputData) async {
+    WidgetsFlutterBinding.ensureInitialized();
     if (taskName == AndroidBackgroundRunner.taskName) {
       final queue = UploadQueue(adapter: MockUploadAdapter());
       final hasPending = await BackgroundTaskRunner.run(queue);
