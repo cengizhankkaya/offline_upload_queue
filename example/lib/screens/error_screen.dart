@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:offline_upload_queue/offline_upload_queue.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../main.dart';
 
@@ -16,17 +19,24 @@ class ErrorScreen extends StatelessWidget {
   const ErrorScreen({super.key});
 
   Future<void> _enqueueNonExistent(BuildContext context) async {
-    // copyToSandbox: false + var olmayan yol → fileNotFound → permanentlyFailed
-    const bogusPath = '/tmp/does_not_exist_demo.jpg';
+    // QueueController.enqueue dosyanın gerçekten var olmasını bekler.
+    // Bu yüzden geçici bir dosya yaratıp kuyruğa ekliyoruz. MockUploadAdapter 
+    // metadata'daki 'demo': 'error_case' değerini görüp fileNotFound hatası dönecek.
+    final tempDir = await getTemporaryDirectory();
+    final bogusFile = File('${tempDir.path}/dummy_error_file.jpg');
+    if (!bogusFile.existsSync()) {
+      await bogusFile.writeAsString('dummy');
+    }
+
     await uploadQueue.enqueue(
-      filePath: bogusPath,
+      filePath: bogusFile.path,
       metadata: {'demo': 'error_case'},
     );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Var olmayan dosya eklendi — kısa süre içinde permanentlyFailed olacak',
+            'Hatalı dosya eklendi — kısa süre içinde permanentlyFailed olacak',
           ),
         ),
       );

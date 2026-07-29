@@ -22,6 +22,9 @@ class MockUploadAdapter implements UploadAdapter {
     UploadCancelToken? cancelToken,
   }) async {
     // Simulate a 2-second upload with progress
+    if (metadata['demo'] == 'error_case') {
+      return const UploadResult.failure(FailureType.fileNotFound);
+    }
     const steps = 10;
     for (var i = 1; i <= steps; i++) {
       if (cancelToken?.isCancelled ?? false) {
@@ -62,6 +65,7 @@ final uploadQueue = UploadQueue(
         debugPrint('[${level.name.toUpperCase()}] $message');
       }
     },
+    heartbeatInterval: const Duration(seconds: 5),
     staleLockThreshold: const Duration(seconds: 15),
   ),
 );

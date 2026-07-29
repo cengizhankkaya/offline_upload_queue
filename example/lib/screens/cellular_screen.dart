@@ -38,11 +38,16 @@ class CellularScreen extends StatefulWidget {
 
 class _CellularScreenState extends State<CellularScreen> {
   bool _paused = false;
+  bool _isReady = false;
 
   @override
   void initState() {
     super.initState();
-    _ensureWifiQueueReady();
+    _ensureWifiQueueReady().then((_) {
+      if (mounted) {
+        setState(() => _isReady = true);
+      }
+    });
   }
 
   Future<void> _pickAndEnqueue() async {
@@ -124,34 +129,38 @@ class _CellularScreenState extends State<CellularScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Canlı özet
-            StreamBuilder<QueueSummary>(
-              stream: wifiOnlyQueue.watchSummary(),
-              builder: (context, snap) {
-                final s = snap.data;
-                if (s == null) return const SizedBox.shrink();
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.4),
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _Info('Bekliyor', s.pending.toString()),
-                      _Info('Tamamlandı', s.completed.toString()),
-                      _Info('Duraklatıldı', s.isPaused ? 'Evet' : 'Hayır'),
-                    ],
-                  ),
-                );
-              },
-            ),
+            // Canlı özet (Sadece kuyruk hazırsa göster)
+            _isReady
+                ? StreamBuilder<QueueSummary>(
+                    stream: wifiOnlyQueue.watchSummary(),
+                    builder: (context, snap) {
+                      final s = snap.data;
+                      if (s == null) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: theme.colorScheme.outline
+                                .withValues(alpha: 0.4),
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _Info('Bekliyor', s.pending.toString()),
+                            _Info('Tamamlandı', s.completed.toString()),
+                            _Info('Duraklatıldı',
+                                s.isPaused ? 'Evet' : 'Hayır'),
+                          ],
+                        ),
+                      );
+                    },
+                  )
+                : const Center(child: CircularProgressIndicator()),
             const SizedBox(height: 24),
 
             // Butonlar

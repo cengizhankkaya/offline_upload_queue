@@ -30,6 +30,14 @@ class QueueScreen extends StatelessWidget {
         .toList();
 
     await uploadQueue.enqueueBatch(items);
+    
+    // Arka plan işleyicisini (Workmanager) uyar
+    try {
+      await AndroidBackgroundRunner.scheduleNextRun();
+    } catch (e) {
+      debugPrint('Background schedule error: $e');
+    }
+
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${files.length} dosya kuyruğa eklendi')),
@@ -228,21 +236,25 @@ class _TaskTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (task.status == UploadStatus.uploading)
-              StreamBuilder<double>(
-                stream: uploadQueue.watchProgress(task.taskId),
-                builder: (ctx, snap) {
-                  return SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: CircularProgressIndicator(
-                      value: snap.data,
-                      strokeWidth: 3,
-                    ),
-                  );
-                },
-              )
-            else if (task.status == UploadStatus.pending ||
-                task.status == UploadStatus.failed)
+              Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: StreamBuilder<double>(
+                  stream: uploadQueue.watchProgress(task.taskId),
+                  builder: (ctx, snap) {
+                    return SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        value: snap.data,
+                        strokeWidth: 3,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            if (task.status == UploadStatus.pending ||
+                task.status == UploadStatus.failed ||
+                task.status == UploadStatus.uploading)
               IconButton(
                 icon: const Icon(Icons.cancel_outlined),
                 onPressed: () => uploadQueue.cancel(task.taskId),
