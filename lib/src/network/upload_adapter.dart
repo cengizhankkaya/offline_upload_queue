@@ -56,6 +56,9 @@ class UploadCancelToken {
   /// çağrıldığında yeniden kaydedilir, önceki üzerine yazılır.
   void registerOnCancel(void Function() callback) {
     _onCancelCallback = callback;
+    if (_cancelled) {
+      callback();
+    }
   }
 
   /// Token'ı iptal eder ve kayıtlı callback'i çağırır.

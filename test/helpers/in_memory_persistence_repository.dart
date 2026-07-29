@@ -233,11 +233,19 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   Stream<QueueSummary> watchSummary({
     bool isPaused = false,
     bool pausedDueToAuth = false,
-  }) async* {
-    yield _buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth);
-    await for (final _ in _changeNotifier.stream) {
-      yield _buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth);
-    }
+  }) {
+    late StreamSubscription<void> sub;
+    final controller = StreamController<QueueSummary>(sync: true);
+    controller.onListen = () {
+      controller.add(_buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth));
+      sub = _changeNotifier.stream.listen((_) {
+        if (!controller.isClosed) {
+          controller.add(_buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth));
+        }
+      });
+    };
+    controller.onCancel = () => sub.cancel();
+    return controller.stream;
   }
 
   QueueSummary _buildSummary({

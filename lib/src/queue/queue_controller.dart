@@ -54,6 +54,7 @@ class QueueController {
   bool _disposed = false;
   bool _lockAcquired = false;
   final _activeTokens = <String, UploadCancelToken>{};
+  final _backoffTimers = <String, Timer>{};
   DateTime? _backgroundDeadline;
 
   // forceUploadOnce snapshot: bu taskId'ler wifiOnly bypass ile işlenebilir
@@ -489,6 +490,11 @@ class QueueController {
   Future<void> _uploadTask(UploadTask task) async {
     await _repo.markUploading(task.taskId);
 
+    if (_disposed) {
+      try { await _repo.markPending(task.taskId); } catch (_) {}
+      return;
+    }
+
     // Checksum hesapla veya enqueue'da pinlenmiş olanı kullan
     String checksum;
     try {
@@ -504,10 +510,7 @@ class QueueController {
           task.taskId,
           failureType: FailureType.network,
           errorMessage: 'Checksum hesaplanamadı: $e',
-          nextRetryAt: _retryPolicy.nextRetryAt(
-            retryCount: task.retryCount,
-            failureType: FailureType.network,
-          ),
+          nextRetryAt: DateTime.now().subtract(const Duration(seconds: 1)),
         );
         final nextRetry = _retryPolicy.nextRetryAt(
           retryCount: task.retryCount,
@@ -516,10 +519,16 @@ class QueueController {
         if (nextRetry != null) {
           final delay = nextRetry.difference(DateTime.now());
           if (delay > Duration.zero) {
-            Timer(delay + const Duration(milliseconds: 1), _triggerWorker);
+            if (_disposed) return; // dispose edildiyse timer oluşturma
+            final timer = Timer(delay + const Duration(milliseconds: 1), () {
+              _backoffTimers.remove(task.taskId);
+              _triggerWorker();
+            });
+            _backoffTimers[task.taskId] = timer;
           }
         }
       } else {
+        
         _log(
           'Dosya okunamıyor, corruptFile olarak işaretleniyor: ${task.taskId}',
           level: LogLevel.warning,
@@ -533,11 +542,25 @@ class QueueController {
       return;
     }
 
+    if (_disposed) {
+      try { await _repo.markPending(task.taskId); } catch (_) {}
+      return;
+    }
+
     await _repo.updateChecksum(task.taskId, checksum);
+
+    if (_disposed) {
+      try { await _repo.markPending(task.taskId); } catch (_) {}
+      return;
+    }
 
     // Upload
     final cancelToken = UploadCancelToken();
     _activeTokens[task.taskId] = cancelToken;
+
+    if (_disposed) {
+      cancelToken.cancel();
+    }
 
     // Progress aktarımı
     final progressController = _progressControllers[task.taskId];
@@ -564,6 +587,9 @@ class QueueController {
       // İptal — sessizce pending'e bırak (cancel() zaten markCancelled yaptı)
       if (cancelToken.isCancelled) {
         _activeTokens.remove(task.taskId);
+        if (_disposed) {
+          try { await _repo.markPending(task.taskId); } catch (_) {}
+        }
         return;
       }
       result = UploadResult.failure(FailureType.network);
@@ -614,6 +640,27 @@ class QueueController {
   Future<void> _handleFailure(UploadTask task, UploadResult result) async {
     final failureType = result.failureType ?? FailureType.unknown;
 
+    // Kalıcı hata kontrolü
+    if (_retryPolicy.isPermanent(failureType)) {
+      await _repo.markPermanentlyFailed(
+        task.taskId,
+        failureType: failureType,
+        errorMessage: 'Kalıcı hata: $failureType',
+      );
+      return;
+    }
+
+    // maxAttempts aşımı (authExpired dahil tüm geçici hatalar için önce kontrol et)
+    if (_retryPolicy.shouldPermanentlyFail(task.retryCount)) {
+      await _repo.markPermanentlyFailed(
+        task.taskId,
+        failureType: failureType,
+        errorMessage:
+            'maxAttempts (${_retryPolicy.maxAttempts}) aşıldı — son hata: $failureType',
+      );
+      return;
+    }
+
     // authExpired → onAuthExpired callback
     final authCallback = _onAuthExpired;
     if (failureType == FailureType.authExpired && authCallback != null) {
@@ -633,7 +680,7 @@ class QueueController {
         await _repo.markFailed(
           task.taskId,
           failureType: failureType,
-          nextRetryAt: null, // Hemen alınsın
+          nextRetryAt: DateTime.now().subtract(const Duration(seconds: 1)), // Hemen alınsın, isBefore(now) true olsun
         );
         _triggerWorker();
         return;
@@ -645,27 +692,6 @@ class QueueController {
         );
         // Normal failed/backoff akışına düş (aşağıda devam eder)
       }
-    }
-
-    // Kalıcı hata kontrolü
-    if (_retryPolicy.isPermanent(failureType)) {
-      await _repo.markPermanentlyFailed(
-        task.taskId,
-        failureType: failureType,
-        errorMessage: 'Kalıcı hata: $failureType',
-      );
-      return;
-    }
-
-    // maxAttempts aşımı
-    if (_retryPolicy.shouldPermanentlyFail(task.retryCount)) {
-      await _repo.markPermanentlyFailed(
-        task.taskId,
-        failureType: failureType,
-        errorMessage:
-            'maxAttempts (${_retryPolicy.maxAttempts}) aşıldı — son hata: $failureType',
-      );
-      return;
     }
 
     // Geçici hata → backoff
@@ -684,7 +710,12 @@ class QueueController {
     if (nextRetry != null) {
       final delay = nextRetry.difference(DateTime.now());
       if (delay > Duration.zero) {
-        Timer(delay + const Duration(milliseconds: 1), _triggerWorker);
+        if (_disposed) return; // dispose edildiyse timer oluşturma
+        final timer = Timer(delay + const Duration(milliseconds: 1), () {
+          _backoffTimers.remove(task.taskId);
+          _triggerWorker();
+        });
+        _backoffTimers[task.taskId] = timer;
       }
     }
   }
@@ -738,13 +769,21 @@ class QueueController {
     // Aktif upload'ları iptal et ve pending'e döndür (cancelled değil!)
     // bkz. §8 — dispose() görevi cancelled'a almaz, sonraki init()'te
     // backoff beklemeden tekrar alınabilir olsun diye pending'e döner.
-    for (final entry in _activeTokens.entries) {
+    final activeEntries = _activeTokens.entries.toList();
+    for (final entry in activeEntries) {
       entry.value.cancel();
       try {
         await _repo.markPending(entry.key);
       } catch (_) {}
     }
     _activeTokens.clear();
+
+    for (final timer in _backoffTimers.values) {
+      timer.cancel();
+    }
+    _backoffTimers.clear();
+
+
 
     // Worker trigger stream'ini kapat
     await _triggerController.close();

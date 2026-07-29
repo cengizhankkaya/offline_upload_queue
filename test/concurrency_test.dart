@@ -91,6 +91,7 @@ void main() {
   test(
     '3.3 dispose() aktif upload sırasında → task pending\'e döner (cancelled değil)',
     () async {
+      print('--- 3.3 test started ---');
       final adapter = ControllableUploadAdapter(pauseOnCall: true);
       final uploadStarted = Completer<void>();
 
@@ -102,8 +103,10 @@ void main() {
         backoff: BackoffStrategy.fixed(const Duration(milliseconds: 5)),
       );
       await controller.init();
+      print('--- controller initialized ---');
 
       final taskId = await controller.enqueue(filePath: fakeFilePath);
+      print('--- task enqueued ---');
 
       repo.watchTasks(statuses: {UploadStatus.uploading}).listen((tasks) {
         if (tasks.any((t) => t.taskId == taskId) && !uploadStarted.isCompleted) {
@@ -111,9 +114,12 @@ void main() {
         }
       });
       await uploadStarted.future.timeout(const Duration(seconds: 2));
+      print('--- upload started confirmed ---');
 
       // Aktif upload sırasında dispose
+      print('--- calling controller.dispose() ---');
       await controller.dispose();
+      print('--- controller.dispose() returned ---');
 
       // Tasarım kararı: dispose() task'ı pending'e alır, cancelled'a DEĞİL
       // Sonraki init()'te backoff beklemeden hemen alınabilsin diye
@@ -122,6 +128,7 @@ void main() {
         UploadStatus.pending,
         reason: 'dispose() sonrası task pending olmalı (cancelled değil!)',
       );
+      print('--- 3.3 test finished ---');
     },
   );
 

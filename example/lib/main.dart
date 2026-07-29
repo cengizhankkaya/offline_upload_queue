@@ -62,6 +62,7 @@ final uploadQueue = UploadQueue(
         debugPrint('[${level.name.toUpperCase()}] $message');
       }
     },
+    staleLockThreshold: const Duration(seconds: 15),
   ),
 );
 
@@ -70,7 +71,8 @@ void main() async {
 
   Workmanager().initialize(callbackDispatcher);
 
-  await uploadQueue.init();
+  // FutureBuilder içinde çağrılacak
+  // uploadQueue.init() burada çağrılmıyor.
 
   runApp(const OfflineUploadQueueDemoApp());
 }
@@ -104,6 +106,13 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
+  late final Future<void> _initFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initFuture = uploadQueue.init();
+  }
 
   static const _screens = [
     QueueScreen(),
@@ -115,7 +124,27 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_selectedIndex],
+      body: FutureBuilder(
+        future: _initFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Kuyruk başlatılıyor... (Kilit bekleniyor olabilir)'),
+                ],
+              ),
+            );
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Hata: ${snapshot.error}'));
+          }
+          return _screens[_selectedIndex];
+        },
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
