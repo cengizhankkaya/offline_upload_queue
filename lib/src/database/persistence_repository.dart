@@ -25,12 +25,13 @@ abstract class PersistenceRepository {
   /// [filePath] dosya yolu.
   /// [metadata] JSON serileştirilebilir anahtar-değer çiftleri.
   /// [fileSizeBytes] dosyanın bayt cinsinden boyutu (`stat()` ile doldurulur).
-  /// [sequenceNumber] kuyruktaki mantıksal sıra.
   /// [taskId] UUID idempotency anahtarı.
+  ///
+  /// Sequence numarası repository tarafından atomik olarak üretilir
+  /// (transaction içinde MAX+1). Dışarıdan geçilmesi gerekmiyor.
   Future<UploadTask> enqueue({
     required String taskId,
     required String filePath,
-    required int sequenceNumber,
     int? fileSizeBytes,
     Map<String, dynamic>? metadata,
     int priority = 0,
@@ -164,6 +165,6 @@ abstract class PersistenceRepository {
   /// (Aktif `uploading` görevlere dokunulmaz — önce iptal edilmeleri gerekir).
   Future<void> purgeAll({bool includePending = false});
 
-  /// Kaynakları serbest bırakır. [QueueController.dispose()] tarafından çağrılır.
+  /// Kaynakları serbest bırakır. UploadQueue.dispose() tarafından çağrılır.
   Future<void> dispose();
 }

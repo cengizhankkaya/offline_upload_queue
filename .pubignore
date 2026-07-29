@@ -4,3 +4,5 @@ docs/
 MANUAL_TESTING.md
 .github/
 .env*
+.idea/
+*.iml

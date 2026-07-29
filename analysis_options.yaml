@@ -8,3 +8,7 @@ linter:
     # QueueController uses renamed parameters (repository → _repo, etc.) which
     # are not eligible for initializing formals. Disable to avoid false positives.
     prefer_initializing_formals: false
+
+analyzer:
+  errors:
+    avoid_print: ignore

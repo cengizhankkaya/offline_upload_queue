@@ -1,3 +1,15 @@
+## 0.6.0
+
+### Breaking Changes
+- **API Değişikliği:** `PersistenceRepository.enqueue` imzasından `sequenceNumber` parametresi kaldırıldı. Sequence numarası artık repository tarafından (transaction içerisinde güvenli şekilde) otomatik üretiliyor. Özel `PersistenceRepository` implementasyonlarının `enqueue` imzalarını güncellemeleri gerekir.
+
+## 0.5.1
+
+### Fixes & Improvements
+- **Performans:** Büyük dosyalarda (örn. 50MB+) enqueue işlemi sırasında oluşan RAM spike'ı önlemek için checksum hesaplaması streaming (chunked SHA-256) kullanacak şekilde güncellendi.
+- **Hafıza:** Tamamlanan (completed, cancelled, permanentlyFailed) görevlerde progress stream controller'larının map'te birikmesine neden olan hafıza sızıntısı giderildi.
+- **Güvenilirlik:** Dosyaların sandbox dizinine kopyalanması sırasında dosya uzantısının hesaplanmasındaki bir kırılganlık (`path` paketi kullanılarak) giderildi.
+
 ## 0.5.0
 
 ### Breaking Changes

@@ -81,11 +81,7 @@ void main() {
         releaseDelay: const Duration(milliseconds: 20),
       );
 
-      await repo.enqueue(
-        taskId: 'stale-task',
-        filePath: fakeFilePath,
-        sequenceNumber: 1,
-      );
+      await repo.enqueue(taskId: 'stale-task', filePath: fakeFilePath);
 
       final completedCompleter = Completer<void>();
       repo.watchTasks(statuses: {UploadStatus.completed}).listen((tasks) {
@@ -124,11 +120,7 @@ void main() {
       // İlk çağrı başarısız, lock update eventi YOK (NeverAcquiresLockRepository)
       final repo = NeverAcquiresLockRepository();
 
-      await repo.enqueue(
-        taskId: 'blocked-task',
-        filePath: fakeFilePath,
-        sequenceNumber: 1,
-      );
+      await repo.enqueue(taskId: 'blocked-task', filePath: fakeFilePath);
 
       final controller = QueueController(
         repository: repo,
@@ -184,11 +176,7 @@ void main() {
       final repo = InMemoryPersistenceRepository();
 
       // Task eklendi ama worker başlamadan önce silindi
-      await repo.enqueue(
-        taskId: 'ghost-task',
-        filePath: fakeFilePath,
-        sequenceNumber: 1,
-      );
+      await repo.enqueue(taskId: 'ghost-task', filePath: fakeFilePath);
       await repo.purge('ghost-task');
 
       final controller = makeController(

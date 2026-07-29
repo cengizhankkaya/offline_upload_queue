@@ -28,5 +28,8 @@ doc/api/
 
 # Planlama belgeleri — GitHub'a gönderilmez
 docs/
+.agents/
 
-
+# IDE files
+.idea/
+*.iml

@@ -43,7 +43,9 @@ class MockUploadAdapter implements UploadAdapter {
 class ExampleRestAdapter implements UploadAdapter {
   // TODO: Update this to your development machine's local IP address
   // For Android Emulator, use 10.0.2.2. For iOS Simulator, use localhost.
-  final String baseUrl = 'http://10.0.2.2:8080';
+  final String baseUrl = Platform.isAndroid
+      ? 'http://10.0.2.2:8080'
+      : 'http://localhost:8080';
 
   @override
   Future<UploadResult> uploadFile({
@@ -102,8 +104,7 @@ void callbackDispatcher() {
 }
 
 final uploadQueue = UploadQueue(
-  adapter:
-      ExampleRestAdapter(), // Using real network adapter to talk to mock server
+  adapter: MockUploadAdapter(),
   wifiOnly: false,
   maxAttempts: 4,
   advanced: UploadQueueAdvancedOptions(
@@ -134,6 +135,17 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   Workmanager().initialize(callbackDispatcher);
+
+  if (Platform.isIOS) {
+    IosBackgroundChannel.instance.setMethodCallHandler(
+      onAppRefresh: () => BackgroundTaskRunner.run(uploadQueue),
+      onProcessing: () => BackgroundTaskRunner.run(uploadQueue),
+      onExpiration: () {
+        // Sistem süresi bitince upload'ı iptal edip pending'e döndür
+        uploadQueue.dispose();
+      },
+    );
+  }
 
   // FutureBuilder içinde çağrılacak
   // uploadQueue.init() burada çağrılmıyor.

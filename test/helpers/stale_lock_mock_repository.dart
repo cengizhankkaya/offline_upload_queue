@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:offline_upload_queue/src/database/persistence_repository.dart';
-
 import 'in_memory_persistence_repository.dart';
 
 /// Kilit davranışını kontrol edebilen test `PersistenceRepository`.

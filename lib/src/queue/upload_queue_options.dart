@@ -73,8 +73,8 @@ class UploadQueueAdvancedOptions {
 
   /// Disk kullanımı [diskUsageWarningBytes] eşiğini her aşışında çağrılır.
   ///
-  /// [currentBytes]: anlık toplam kullanım.
-  /// [warningBytes]: [diskUsageWarningBytes] değeri.
+  /// `currentBytes`: anlık toplam kullanım.
+  /// `warningBytes`: [diskUsageWarningBytes] değeri.
   ///
   /// `null` ise (varsayılan) hiçbir ek maliyet oluşmaz.
   final void Function(int currentBytes, int warningBytes)? onDiskUsageWarning;

@@ -23,7 +23,9 @@ class DummyAdapter implements UploadAdapter {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('Performance: Bulk Enqueue (1000 files)', (WidgetTester tester) async {
+  testWidgets('Performance: Bulk Enqueue (1000 files)', (
+    WidgetTester tester,
+  ) async {
     final queue = UploadQueue(adapter: DummyAdapter(), boxName: 'perf_bulk');
     await queue.init();
     queue.pause(); // Pause to prevent processing during enqueue
@@ -39,7 +41,10 @@ void main() {
     stopwatch.stop();
 
     // 1000 DB inserts + 1000 sandbox file copies should be reasonably fast
-    expect(stopwatch.elapsedMilliseconds, lessThan(150000)); // Should be well within 150s on emulator
+    expect(
+      stopwatch.elapsedMilliseconds,
+      lessThan(150000),
+    ); // Should be well within 150s on emulator
 
     final summary = await queue.watchSummary().first;
     expect(summary.pending, 1000);

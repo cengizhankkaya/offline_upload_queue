@@ -52,6 +52,9 @@ Future<void> handleUpload(HttpRequest request) async {
 
   print('Received upload of $byteCount bytes.');
 
+  // Add a 2-second delay to allow upload_test to observe the uploading state
+  await Future.delayed(const Duration(seconds: 2));
+
   request.response
     ..statusCode = HttpStatus.ok
     ..write(jsonEncode({'status': 'success', 'bytesReceived': byteCount}))

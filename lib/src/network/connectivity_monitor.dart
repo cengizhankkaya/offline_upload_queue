@@ -52,7 +52,7 @@ abstract class ConnectivityMonitor {
   ///
   /// Worker bu stream'e abone olarak bağlantı geldiğinde otomatik devreye
   /// girer. Stream hiç kapanmaz — `dispose()` çağrıldığında abonelik
-  /// [QueueController] tarafından iptal edilir.
+  /// UploadQueue tarafından iptal edilir.
   Stream<ConnectivityStatus> get statusStream;
 }
 
@@ -182,7 +182,7 @@ class DefaultConnectivityMonitor implements ConnectivityMonitor {
   @override
   Stream<ConnectivityStatus> get statusStream => _controller.stream;
 
-  /// Kaynakları serbest bırakır. [QueueController.dispose()] tarafından çağrılır.
+  /// Kaynakları serbest bırakır. UploadQueue.dispose() tarafından çağrılır.
   Future<void> dispose() async {
     await _sub?.cancel();
     await _controller.close();

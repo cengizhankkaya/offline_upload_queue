@@ -102,13 +102,12 @@ class SembastPersistenceRepository implements PersistenceRepository {
   /// Yeni bir görevi atomik olarak oluşturur, DB'ye yazar ve döndürür.
   ///
   /// Sequence numarası sembast transaction içinde MAX+1 olarak atomik üretilir.
-  /// Dışarıdan geçilen [sequenceNumber] yoksayılır; transaction garantili
+  /// Dışarıdan geçilen sequenceNumber parametresi (varsa) yoksayılır; transaction garantili
   /// değer kullanılır.
   @override
   Future<UploadTask> enqueue({
     required String taskId,
     required String filePath,
-    required int sequenceNumber,
     int? fileSizeBytes,
     Map<String, dynamic>? metadata,
     int priority = 0,
@@ -222,6 +221,9 @@ class SembastPersistenceRepository implements PersistenceRepository {
     final fields = <String, Object?>{'status': UploadStatus.completed.index};
     if (checksum != null) fields['checksum'] = checksum;
     await _updateTask(taskId, fields);
+    _cleanupProgressController(
+      taskId,
+    ); // Görev terminal duruma geçti — progress stream kapat
   }
 
   @override
@@ -256,6 +258,9 @@ class SembastPersistenceRepository implements PersistenceRepository {
       'failureType': failureType.index,
       'errorMessage': errorMessage,
     });
+    _cleanupProgressController(
+      taskId,
+    ); // Görev terminal duruma geçti — progress stream kapat
   }
 
   @override
@@ -266,6 +271,9 @@ class SembastPersistenceRepository implements PersistenceRepository {
       'status': UploadStatus.cancelled.index,
       'nextRetryAt': null,
     });
+    _cleanupProgressController(
+      taskId,
+    ); // Görev terminal duruma geçti — progress stream kapat
   }
 
   @override
@@ -476,6 +484,9 @@ class SembastPersistenceRepository implements PersistenceRepository {
 
     await _deleteSandboxFile(record['filePath'] as String?);
     await _taskStore.record(taskId).delete(_db);
+    _cleanupProgressController(
+      taskId,
+    ); // Silinen görevin progress controller'nı temizle
   }
 
   @override
@@ -518,6 +529,9 @@ class SembastPersistenceRepository implements PersistenceRepository {
 
     for (final row in rows) {
       await _deleteSandboxFile(row.value['filePath'] as String?);
+      _cleanupProgressController(
+        row.key,
+      ); // Her silinen görevin progress controller'nı temizle
     }
 
     await _taskStore.delete(
@@ -534,6 +548,16 @@ class SembastPersistenceRepository implements PersistenceRepository {
     } catch (_) {
       // Dosya silme hatası DB işlemini engellemez
     }
+  }
+
+  /// Terminal duruma geçen bir görevin progress [StreamController]'nı
+  /// kapatıp map'ten çıkarır.
+  ///
+  /// `completed`, `permanentlyFailed`, `cancelled` ve `purge` operasyonları
+  /// sonrası çağrılır. Dinleyicisi olmayan controller için no-op.
+  void _cleanupProgressController(String taskId) {
+    final ctrl = _progressControllers.remove(taskId);
+    ctrl?.close();
   }
 
   // ── Dispose ───────────────────────────────────────────────────────────────

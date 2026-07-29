@@ -55,12 +55,7 @@ void main() {
       await repo1.init();
 
       for (var i = 0; i < 3; i++) {
-        final seq = await repo1.getNextSequenceNumber();
-        await repo1.enqueue(
-          taskId: 'task-$i',
-          filePath: '/tmp/file-$i.jpg',
-          sequenceNumber: seq,
-        );
+        await repo1.enqueue(taskId: 'task-$i', filePath: '/tmp/file-$i.jpg');
       }
       await repo1.dispose(); // El değiştirme hazırlığı
 
@@ -68,12 +63,7 @@ void main() {
       final repo2 = SembastPersistenceRepository(boxName: boxName);
       await repo2.init();
 
-      final seq2 = await repo2.getNextSequenceNumber();
-      await repo2.enqueue(
-        taskId: 'task-bg',
-        filePath: '/tmp/file-bg.jpg',
-        sequenceNumber: seq2,
-      );
+      await repo2.enqueue(taskId: 'task-bg', filePath: '/tmp/file-bg.jpg');
 
       // Tüm görevleri doğrula
       final now = DateTime.now();
@@ -104,12 +94,7 @@ void main() {
       final futures = <Future<void>>[];
       for (var i = 0; i < 5; i++) {
         futures.add(
-          repo.enqueue(
-            taskId: 'concurrent-$i',
-            filePath: '/tmp/file-$i.jpg',
-            sequenceNumber:
-                0, // getNextSequenceNumber kullanmıyoruz, transaction a güveniyoruz
-          ),
+          repo.enqueue(taskId: 'concurrent-$i', filePath: '/tmp/file-$i.jpg'),
         );
       }
       await Future.wait(futures);
@@ -176,11 +161,9 @@ void main() {
       final repo1 = SembastPersistenceRepository(boxName: boxName);
       await repo1.init();
 
-      final seq = await repo1.getNextSequenceNumber();
       final task = await repo1.enqueue(
         taskId: 'crash-task',
         filePath: '/tmp/crash.jpg',
-        sequenceNumber: seq,
       );
       await repo1.markUploading(task.taskId);
 

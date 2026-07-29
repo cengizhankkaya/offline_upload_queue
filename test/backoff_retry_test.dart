@@ -57,11 +57,7 @@ void main() {
         );
         await controller.init();
 
-        await repo.enqueue(
-          taskId: 'task-1-1',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
+        await repo.enqueue(taskId: 'task-1-1', filePath: fakeFilePath);
         repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
           tasks,
         ) {
@@ -178,20 +174,12 @@ void main() {
         // task-a (seq=1) permanentlyFailed → retry() → pending
         // task-c (seq=3) yeni eklendi
         // getNextPending → task-a döner (seq=1 < seq=3) → önce işlenir
-        await repo.enqueue(
-          taskId: 'task-a',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
+        await repo.enqueue(taskId: 'task-a', filePath: fakeFilePath);
         await repo.markPermanentlyFailed(
           'task-a',
           failureType: FailureType.fileNotFound,
         );
-        await repo.enqueue(
-          taskId: 'task-c',
-          filePath: fakeFilePath,
-          sequenceNumber: 3,
-        );
+        await repo.enqueue(taskId: 'task-c', filePath: fakeFilePath);
 
         // retry → pending (retryCount sıfırlanır, sequenceNumber korunur)
         await repo.markPending('task-a');
@@ -218,11 +206,7 @@ void main() {
           repo: repo,
           maxAttempts: 3,
         );
-        await repo.enqueue(
-          taskId: 'cancelled-retry',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
+        await repo.enqueue(taskId: 'cancelled-retry', filePath: fakeFilePath);
         await repo.markCancelled('cancelled-retry');
 
         await controller.init();
@@ -262,11 +246,7 @@ void main() {
         );
         await controller.init();
 
-        await repo.enqueue(
-          taskId: 'backoff-pause',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
+        await repo.enqueue(taskId: 'backoff-pause', filePath: fakeFilePath);
         repo.watchTasks(statuses: {UploadStatus.failed}).listen((tasks) {
           if (tasks.any((t) => t.taskId == 'backoff-pause') &&
               !failedCompleter.isCompleted) {
@@ -323,11 +303,7 @@ void main() {
         await controller.init();
 
         // repo.enqueue() doğrudan → dosya varlık kontrolü atlanır
-        await repo.enqueue(
-          taskId: 'corrupt-task',
-          filePath: nonExistentPath,
-          sequenceNumber: 1,
-        );
+        await repo.enqueue(taskId: 'corrupt-task', filePath: nonExistentPath);
         repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
           tasks,
         ) {
@@ -367,11 +343,7 @@ void main() {
       );
       await controller.init();
 
-      await repo.enqueue(
-        taskId: 'pf-no-auto',
-        filePath: fakeFilePath,
-        sequenceNumber: 1,
-      );
+      await repo.enqueue(taskId: 'pf-no-auto', filePath: fakeFilePath);
       repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
         tasks,
       ) {

@@ -233,11 +233,7 @@ void main() {
       );
       await controller.init();
 
-      await repo.enqueue(
-        taskId: 'task-1',
-        filePath: fakeFilePath,
-        sequenceNumber: 1,
-      );
+      await repo.enqueue(taskId: 'task-1', filePath: fakeFilePath);
       controller
           .triggerWorkerForTesting(); // wifiOnly+cellular → pending kalmalı
       await Future.delayed(const Duration(milliseconds: 100));
@@ -262,11 +258,7 @@ void main() {
       );
       await controller.init();
 
-      await repo.enqueue(
-        taskId: 'task-2',
-        filePath: fakeFilePath,
-        sequenceNumber: 2,
-      );
+      await repo.enqueue(taskId: 'task-2', filePath: fakeFilePath);
       await controller.forceUploadOnce(); // snapshot alır + trigger
       await completer.future.timeout(const Duration(seconds: 2));
 
@@ -286,11 +278,7 @@ void main() {
       await controller.init();
 
       controller.pause();
-      await repo.enqueue(
-        taskId: 'task-3',
-        filePath: fakeFilePath,
-        sequenceNumber: 3,
-      );
+      await repo.enqueue(taskId: 'task-3', filePath: fakeFilePath);
       controller.triggerWorkerForTesting(); // pause aktif → işlenmemeli
       await controller.forceUploadOnce(); // pause aktif → return yapar
       await Future.delayed(const Duration(milliseconds: 100));
@@ -310,11 +298,7 @@ void main() {
       );
       await controller.init();
 
-      await repo.enqueue(
-        taskId: 'task-4',
-        filePath: fakeFilePath,
-        sequenceNumber: 4,
-      );
+      await repo.enqueue(taskId: 'task-4', filePath: fakeFilePath);
       repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
         tasks,
       ) {
@@ -342,11 +326,7 @@ void main() {
       );
       await controller.init();
 
-      await repo.enqueue(
-        taskId: 'task-5',
-        filePath: fakeFilePath,
-        sequenceNumber: 5,
-      );
+      await repo.enqueue(taskId: 'task-5', filePath: fakeFilePath);
       repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
         tasks,
       ) {
@@ -374,11 +354,7 @@ void main() {
         );
         await controller.init();
 
-        await repo.enqueue(
-          taskId: 'task-6',
-          filePath: fakeFilePath,
-          sequenceNumber: 6,
-        );
+        await repo.enqueue(taskId: 'task-6', filePath: fakeFilePath);
         repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
           tasks,
         ) {
@@ -397,11 +373,7 @@ void main() {
     );
 
     test('init() uploading → pending recovery yapar', () async {
-      await repo.enqueue(
-        taskId: 'task-7',
-        filePath: fakeFilePath,
-        sequenceNumber: 7,
-      );
+      await repo.enqueue(taskId: 'task-7', filePath: fakeFilePath);
       await repo.markUploading('task-7');
       expect(repo.taskFor('task-7')?.status, UploadStatus.uploading);
 
@@ -411,16 +383,8 @@ void main() {
     });
 
     test('watchTasks({pending}) yalnızca pending döner', () async {
-      await repo.enqueue(
-        taskId: 'task-8a',
-        filePath: fakeFilePath,
-        sequenceNumber: 8,
-      );
-      await repo.enqueue(
-        taskId: 'task-8b',
-        filePath: fakeFilePath,
-        sequenceNumber: 9,
-      );
+      await repo.enqueue(taskId: 'task-8a', filePath: fakeFilePath);
+      await repo.enqueue(taskId: 'task-8b', filePath: fakeFilePath);
       await repo.markCompleted('task-8b');
 
       final tasks = await repo
@@ -431,16 +395,8 @@ void main() {
     });
 
     test('purgeAllCompleted() → completed kayıtlar silinir', () async {
-      await repo.enqueue(
-        taskId: 'task-9a',
-        filePath: fakeFilePath,
-        sequenceNumber: 10,
-      );
-      await repo.enqueue(
-        taskId: 'task-9b',
-        filePath: fakeFilePath,
-        sequenceNumber: 11,
-      );
+      await repo.enqueue(taskId: 'task-9a', filePath: fakeFilePath);
+      await repo.enqueue(taskId: 'task-9b', filePath: fakeFilePath);
       await repo.markCompleted('task-9a');
 
       await repo.purgeAllCompleted();
@@ -476,7 +432,6 @@ void main() {
       await repo.enqueue(
         taskId: 'task-10',
         filePath: fakeFilePath,
-        sequenceNumber: 12,
         fileSizeBytes: 200,
       );
       // Heartbeat timer 50ms aralıkla çalışır; 300ms bekleyerek en az 2 heartbeat
@@ -501,16 +456,8 @@ void main() {
     });
 
     test('purgeAllCancelled() → cancelled kayıtlar temizlenir', () async {
-      await repo.enqueue(
-        taskId: 'task-12a',
-        filePath: fakeFilePath,
-        sequenceNumber: 13,
-      );
-      await repo.enqueue(
-        taskId: 'task-12b',
-        filePath: fakeFilePath,
-        sequenceNumber: 14,
-      );
+      await repo.enqueue(taskId: 'task-12a', filePath: fakeFilePath);
+      await repo.enqueue(taskId: 'task-12b', filePath: fakeFilePath);
       await repo.markCancelled('task-12a');
 
       await repo.purgeAllCancelled();
@@ -525,13 +472,11 @@ void main() {
         await repo.enqueue(
           taskId: 'disk-1',
           filePath: fakeFilePath,
-          sequenceNumber: 15,
           fileSizeBytes: 100,
         );
         await repo.enqueue(
           taskId: 'disk-2',
           filePath: fakeFilePath,
-          sequenceNumber: 16,
           fileSizeBytes: 200,
         );
         await repo.markCompleted('disk-2');
@@ -539,7 +484,6 @@ void main() {
         await repo.enqueue(
           taskId: 'disk-trigger',
           filePath: fakeFilePath,
-          sequenceNumber: 17,
           fileSizeBytes: 0,
         );
         await repo.purge('disk-trigger');
@@ -578,11 +522,7 @@ void main() {
     test(
       'markCancelled() → nextRetryAt null olur (§4 Kritik kural #5)',
       () async {
-        await repo.enqueue(
-          taskId: 'cancel-1',
-          filePath: fakeFilePath,
-          sequenceNumber: 100,
-        );
+        await repo.enqueue(taskId: 'cancel-1', filePath: fakeFilePath);
         await repo.markFailed(
           'cancel-1',
           failureType: FailureType.network,
@@ -597,18 +537,10 @@ void main() {
 
     test('getNextSequenceNumber() → her çağrıda artar', () async {
       final seq1 = await repo.getNextSequenceNumber();
-      await repo.enqueue(
-        taskId: 'seq-1',
-        filePath: fakeFilePath,
-        sequenceNumber: seq1,
-      );
+      await repo.enqueue(taskId: 'seq-1', filePath: fakeFilePath);
 
       final seq2 = await repo.getNextSequenceNumber();
-      await repo.enqueue(
-        taskId: 'seq-2',
-        filePath: fakeFilePath,
-        sequenceNumber: seq2,
-      );
+      await repo.enqueue(taskId: 'seq-2', filePath: fakeFilePath);
 
       expect(seq2, greaterThan(seq1));
     });
@@ -650,11 +582,7 @@ void main() {
       );
       await controller.init();
 
-      await repo.enqueue(
-        taskId: 'retry-1',
-        filePath: fakeFilePath,
-        sequenceNumber: 200,
-      );
+      await repo.enqueue(taskId: 'retry-1', filePath: fakeFilePath);
 
       repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
         tasks,
@@ -684,11 +612,7 @@ void main() {
     test(
       'nextRetryAt gelecekte olan failed görev getNextPending() sonucu değil',
       () async {
-        await repo.enqueue(
-          taskId: 'backoff-1',
-          filePath: fakeFilePath,
-          sequenceNumber: 300,
-        );
+        await repo.enqueue(taskId: 'backoff-1', filePath: fakeFilePath);
         await repo.markFailed(
           'backoff-1',
           failureType: FailureType.network,
@@ -701,16 +625,8 @@ void main() {
     );
 
     test('purgeAllFailed() → yalnızca permanentlyFailed silinir', () async {
-      await repo.enqueue(
-        taskId: 'pf-1',
-        filePath: fakeFilePath,
-        sequenceNumber: 400,
-      );
-      await repo.enqueue(
-        taskId: 'pf-2',
-        filePath: fakeFilePath,
-        sequenceNumber: 401,
-      );
+      await repo.enqueue(taskId: 'pf-1', filePath: fakeFilePath);
+      await repo.enqueue(taskId: 'pf-2', filePath: fakeFilePath);
       await repo.markPermanentlyFailed(
         'pf-1',
         failureType: FailureType.badRequest,

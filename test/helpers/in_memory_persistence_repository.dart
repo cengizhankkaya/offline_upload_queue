@@ -51,11 +51,11 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   Future<UploadTask> enqueue({
     required String taskId,
     required String filePath,
-    required int sequenceNumber,
     int? fileSizeBytes,
     Map<String, dynamic>? metadata,
     int priority = 0,
   }) async {
+    final sequenceNumber = await getNextSequenceNumber();
     final task = UploadTask(
       taskId: taskId,
       filePath: filePath,

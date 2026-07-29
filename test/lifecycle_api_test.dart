@@ -59,21 +59,13 @@ void main() {
         await controller.init();
 
         // task-a: snapshot'a girecek (forceUploadOnce öncesi pending)
-        await repo.enqueue(
-          taskId: 'force-a',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
+        await repo.enqueue(taskId: 'force-a', filePath: fakeFilePath);
 
         // Snapshot al (task-a dahil)
         await controller.forceUploadOnce();
 
         // Snapshot SONRASI task-b eklendi — snapshot'a girmemeli
-        await repo.enqueue(
-          taskId: 'force-b',
-          filePath: fakeFilePath,
-          sequenceNumber: 2,
-        );
+        await repo.enqueue(taskId: 'force-b', filePath: fakeFilePath);
 
         repo.watchTasks(statuses: {UploadStatus.completed}).listen((tasks) {
           if (tasks.any((t) => t.taskId == 'force-a') &&
@@ -128,11 +120,7 @@ void main() {
         );
         await controller.init();
 
-        await repo.enqueue(
-          taskId: 'auth-ok',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
+        await repo.enqueue(taskId: 'auth-ok', filePath: fakeFilePath);
         repo.watchTasks(statuses: {UploadStatus.completed}).listen((tasks) {
           if (tasks.any((t) => t.taskId == 'auth-ok') &&
               !completedCompleter.isCompleted) {
@@ -177,11 +165,7 @@ void main() {
         );
         await controller.init();
 
-        await repo.enqueue(
-          taskId: 'auth-timeout',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
+        await repo.enqueue(taskId: 'auth-timeout', filePath: fakeFilePath);
         repo.watchTasks(statuses: {UploadStatus.failed}).listen((tasks) {
           if (tasks.any((t) => t.taskId == 'auth-timeout') &&
               !failedCompleter.isCompleted) {
@@ -224,11 +208,7 @@ void main() {
         );
         await controller.init();
 
-        await repo.enqueue(
-          taskId: 'auth-throw',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
+        await repo.enqueue(taskId: 'auth-throw', filePath: fakeFilePath);
         repo.watchTasks(statuses: {UploadStatus.failed}).listen((tasks) {
           if (tasks.any((t) => t.taskId == 'auth-throw') &&
               !failedCompleter.isCompleted) {
@@ -281,16 +261,8 @@ void main() {
         );
         await controller.init();
 
-        await repo.enqueue(
-          taskId: 'auth-a',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
-        await repo.enqueue(
-          taskId: 'auth-b',
-          filePath: fakeFilePath,
-          sequenceNumber: 2,
-        );
+        await repo.enqueue(taskId: 'auth-a', filePath: fakeFilePath);
+        await repo.enqueue(taskId: 'auth-b', filePath: fakeFilePath);
 
         final bothCompleted = Completer<void>();
         repo.watchSummary().listen((s) {
@@ -340,11 +312,7 @@ void main() {
         );
         await controller.init();
 
-        await repo.enqueue(
-          taskId: 'auth-loop',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
+        await repo.enqueue(taskId: 'auth-loop', filePath: fakeFilePath);
         repo.watchTasks(statuses: {UploadStatus.permanentlyFailed}).listen((
           tasks,
         ) {
@@ -444,11 +412,7 @@ void main() {
         final doneCompleter = Completer<void>();
         final freshRepo = InMemoryPersistenceRepository();
 
-        await freshRepo.enqueue(
-          taskId: 'prog-task',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
+        await freshRepo.enqueue(taskId: 'prog-task', filePath: fakeFilePath);
 
         final sub = freshRepo.watchProgress('prog-task').listen((p) {
           values.add(p);
@@ -515,16 +479,8 @@ void main() {
         final sub2 = freshRepo.watchSummary().listen(events2.add);
 
         // İki enqueue → her stream'e 2 ek event gitmeli
-        await freshRepo.enqueue(
-          taskId: 't-a',
-          filePath: fakeFilePath,
-          sequenceNumber: 1,
-        );
-        await freshRepo.enqueue(
-          taskId: 't-b',
-          filePath: fakeFilePath,
-          sequenceNumber: 2,
-        );
+        await freshRepo.enqueue(taskId: 't-a', filePath: fakeFilePath);
+        await freshRepo.enqueue(taskId: 't-b', filePath: fakeFilePath);
 
         // Microtask queue'nun boşalması için bekle
         await Future.delayed(const Duration(milliseconds: 50));

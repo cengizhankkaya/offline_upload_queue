@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:offline_upload_queue/offline_upload_queue.dart';
@@ -31,9 +32,19 @@ class QueueScreen extends StatelessWidget {
 
     await uploadQueue.enqueueBatch(items);
 
-    // Arka plan işleyicisini (Workmanager) uyar
+    // Arka plan işleyicisini uyar
     try {
-      await AndroidBackgroundRunner.scheduleNextRun();
+      if (Platform.isAndroid) {
+        await AndroidBackgroundRunner.scheduleNextRun();
+      } else if (Platform.isIOS) {
+        await IosBackgroundChannel.instance.scheduleAppRefresh(
+          refreshIdentifier: 'com.example.app.upload_refresh',
+        );
+        await IosBackgroundChannel.instance.scheduleProcessing(
+          processingIdentifier: 'com.example.app.upload_processing',
+          requiresNetworkConnectivity: true,
+        );
+      }
     } catch (e) {
       debugPrint('Background schedule error: $e');
     }

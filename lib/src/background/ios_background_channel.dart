@@ -109,7 +109,7 @@ class IosBackgroundChannel {
 
   final _channel = const MethodChannel(_channelName);
 
-  /// Native taraftan gelen metodları [queue] üzerinden işler.
+  /// Native taraftan gelen metodları UploadQueue üzerinden işler.
   ///
   /// [onAppRefresh]: BGAppRefreshTask tetiklendiğinde çağrılır.
   ///   `hasPending` dönerse native taraf zincirleme yeniden kayıt yapar.

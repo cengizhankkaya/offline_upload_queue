@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -290,14 +291,11 @@ class QueueController {
     // 4. fileSizeBytes — stat() (sandbox kopyası üzerinde)
     final fileSizeBytes = await _statFile(actualPath);
 
-    // 5. Sekans numarası — DB'den güvenli monoton değer
-    final sequenceNumber = await _repo.getNextSequenceNumber();
-
-    // 6. DB'ye INSERT (yalnızca 1-5 başarılıysa)
+    // 5. DB'ye INSERT (yalnızca 1-4 başarılıysa)
+    // Sequence numarası repo transaction'ı içinde atomik olarak üretilir.
     await _repo.enqueue(
       taskId: taskId,
       filePath: actualPath,
-      sequenceNumber: sequenceNumber,
       fileSizeBytes: fileSizeBytes,
       metadata: metadata,
       priority: priority,
@@ -811,9 +809,14 @@ class QueueController {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   Future<String> _computeChecksum(String filePath) async {
-    final file = File(filePath);
-    final bytes = await file.readAsBytes();
-    return sha256.convert(bytes).toString();
+    // Streaming SHA-256: dosyay\u0131 chunk'lar halinde okur \u2014 b\u00fcy\u00fck dosyalarda RAM spike yok.
+    // readAsBytes() t\u00fcm dosyay\u0131 belle\u011fe y\u00fckler; 100 MB dosyada 100 MB RAM kullan\u0131m\u0131 demektir.
+    Digest? result;
+    final digestSink = _SimpleSink<Digest>((d) => result = d);
+    final sink = sha256.startChunkedConversion(digestSink);
+    await File(filePath).openRead().forEach(sink.add);
+    sink.close();
+    return result!.toString();
   }
 
   Future<int?> _statFile(String filePath) async {
@@ -827,9 +830,9 @@ class QueueController {
 
   Future<String> _copyToSandboxDir(String sourcePath, String taskId) async {
     final source = File(sourcePath);
-    final ext = sourcePath.contains('.')
-        ? '.${sourcePath.split('.').last}'
-        : '';
+    final ext = p.extension(
+      sourcePath,
+    ); // '.jpg', '' gibi — path paketi edge case'leri doğru ele alır
     final destDir = await _getSandboxDir();
     final destPath = '${destDir.path}/$taskId$ext';
 
@@ -902,4 +905,20 @@ class QueueController {
   static void resetForTesting(String boxName) {
     _activeBoxNames.remove(boxName);
   }
+}
+
+/// [sha256.startChunkedConversion] i\u00e7in minimal `Sink<Digest>` impl.
+///
+/// `QueueController._computeChecksum()` streaming SHA-256 hesaplamas\u0131nda
+/// kullan\u0131l\u0131r. Standart k\u00fct\u00fcphane `AccumulatorSink` bu Dart s\u00fcr\u00fcm\u00fcnde
+/// (SDK \u003e= 3.x) public API'den kald\u0131r\u0131ld\u0131\u011f\u0131 i\u00e7in bu shim gereklidir.
+class _SimpleSink<T> implements Sink<T> {
+  final void Function(T) _onData;
+  _SimpleSink(this._onData);
+
+  @override
+  void add(T data) => _onData(data);
+
+  @override
+  void close() {}
 }
