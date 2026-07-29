@@ -2,7 +2,7 @@ import 'upload_status.dart';
 
 /// Bir yükleme görevinin anlık görüntüsü — UI ve `watchTasks()` için dışa açılır.
 ///
-/// Drift'in internal row tipinden (`UploadTasksData`) bağımsız, immutable bir
+/// Veritabanı implementasyonundan bağımsız, immutable bir
 /// veri sınıfıdır. `copyWith` ile kısmi kopyalama desteklenir.
 class UploadTask {
   /// Görevin UUID idempotency anahtarı. Backend'e bu değer gönderilir.

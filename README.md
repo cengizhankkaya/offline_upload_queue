@@ -6,6 +6,7 @@ Built for durability, this package ensures your uploads survive app terminations
 [![pub.dev](https://img.shields.io/pub/v/offline_upload_queue.svg?style=flat-square)](https://pub.dev/packages/offline_upload_queue)
 [![pub points](https://img.shields.io/pub/points/offline_upload_queue?style=flat-square)](https://pub.dev/packages/offline_upload_queue/score)
 [![CI](https://github.com/cengizhankkaya/offline_upload_queue/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/cengizhankkaya/offline_upload_queue/actions)
+[![Coverage](https://github.com/cengizhankkaya/offline_upload_queue/actions/workflows/coverage.yml/badge.svg?style=flat-square)](https://github.com/cengizhankkaya/offline_upload_queue/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-blue.svg?style=flat-square)](https://pub.dev/packages/offline_upload_queue)
 

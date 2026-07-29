@@ -506,7 +506,7 @@ Yeniden init() sonrası tekrar işlendi mi (E/H):
 4. Dosyayı bir metin editörüyle aç, `PLAINTEXT_MARKER_XYZ` string'ini ara.
 
 **Beklenen sonuç:**
-- `encryptionKey` **verilmediğinde**: marker düz metin olarak DB dosyasında bulunmalı (bu da README'nin "plaintext SQLite" uyarısının Sembast için de geçerli olduğunu teyit eder).
+- `encryptionKey` **verilmediğinde**: marker düz metin olarak DB dosyasında bulunmalı.
 - `encryptionKey` **verildiğinde**: marker bulunamamalı, dosya şifreli/anlamsız veri içermeli.
 
 **Kayıt şablonu:**
