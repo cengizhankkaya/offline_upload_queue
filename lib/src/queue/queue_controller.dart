@@ -509,6 +509,16 @@ class QueueController {
             failureType: FailureType.network,
           ),
         );
+        final nextRetry = _retryPolicy.nextRetryAt(
+          retryCount: task.retryCount,
+          failureType: FailureType.network,
+        );
+        if (nextRetry != null) {
+          final delay = nextRetry.difference(DateTime.now());
+          if (delay > Duration.zero) {
+            Timer(delay + const Duration(milliseconds: 1), _triggerWorker);
+          }
+        }
       } else {
         _log(
           'Dosya okunamıyor, corruptFile olarak işaretleniyor: ${task.taskId}',
@@ -618,8 +628,13 @@ class QueueController {
         }
         await authCallback().timeout(effectiveTimeout);
         _pausedDueToAuth = false;
-        // Auth yenilendi — görevi pending'e al ve tekrar dene
-        await _repo.markPending(task.taskId);
+        // Auth yenilendi — görevi failed(0 delay) ile tekrar dene
+        // markFailed retryCount'u artırır, böylece sonsuz 401 döngüsü engellenir
+        await _repo.markFailed(
+          task.taskId,
+          failureType: failureType,
+          nextRetryAt: null, // Hemen alınsın
+        );
         _triggerWorker();
         return;
       } catch (e) {
@@ -669,7 +684,7 @@ class QueueController {
     if (nextRetry != null) {
       final delay = nextRetry.difference(DateTime.now());
       if (delay > Duration.zero) {
-        Timer(delay, _triggerWorker);
+        Timer(delay + const Duration(milliseconds: 1), _triggerWorker);
       }
     }
   }

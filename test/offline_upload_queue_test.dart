@@ -64,7 +64,7 @@ class MockUploadAdapter implements UploadAdapter {
 
 /// QueueController'ı InMemory repo + mock bileşenlerle oluşturan yardımcı.
 QueueController makeController({
-  required MockUploadAdapter adapter,
+  required UploadAdapter adapter,
   required MockConnectivityMonitor monitor,
   required InMemoryPersistenceRepository repo,
   bool wifiOnly = false,
@@ -284,12 +284,12 @@ void main() {
       );
       await controller.init();
 
+      controller.pause();
       await repo.enqueue(
         taskId: 'task-3',
         filePath: fakeFilePath,
         sequenceNumber: 3,
       );
-      controller.pause();
       controller.triggerWorkerForTesting(); // pause aktif → işlenmemeli
       await controller.forceUploadOnce();  // pause aktif → return yapar
       await Future.delayed(const Duration(milliseconds: 100));
@@ -471,6 +471,7 @@ void main() {
           advanced: advanced,
         );
         await controller.init();
+        controller.pause();
 
         await repo.enqueue(
           taskId: 'task-10',

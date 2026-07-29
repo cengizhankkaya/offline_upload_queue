@@ -80,7 +80,8 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
         _tasks.values
             .where(
               (t) =>
-                  t.status == UploadStatus.pending &&
+                  (t.status == UploadStatus.pending ||
+                      t.status == UploadStatus.failed) &&
                   (t.nextRetryAt == null ||
                       t.nextRetryAt!.isBefore(now) ||
                       t.nextRetryAt == now),
@@ -232,20 +233,11 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   Stream<QueueSummary> watchSummary({
     bool isPaused = false,
     bool pausedDueToAuth = false,
-  }) {
-    QueueSummary current() => _buildSummary(
-        isPaused: isPaused, pausedDueToAuth: pausedDueToAuth);
-
-    late StreamSubscription<void> sub;
-    final controller = StreamController<QueueSummary>.broadcast(sync: true);
-    controller.onListen = () {
-      controller.add(current());
-      sub = _changeNotifier.stream.listen((_) {
-        if (!controller.isClosed) controller.add(current());
-      });
-    };
-    controller.onCancel = () => sub.cancel();
-    return controller.stream;
+  }) async* {
+    yield _buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth);
+    await for (final _ in _changeNotifier.stream) {
+      yield _buildSummary(isPaused: isPaused, pausedDueToAuth: pausedDueToAuth);
+    }
   }
 
   QueueSummary _buildSummary({

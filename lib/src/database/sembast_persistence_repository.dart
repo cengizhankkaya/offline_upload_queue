@@ -184,7 +184,10 @@ class SembastPersistenceRepository implements PersistenceRepository {
     final allPending = await _taskStore.find(
       _db,
       finder: Finder(
-        filter: Filter.equals('status', UploadStatus.pending.index),
+        filter: Filter.or([
+          Filter.equals('status', UploadStatus.pending.index),
+          Filter.equals('status', UploadStatus.failed.index),
+        ]),
       ),
     );
 
