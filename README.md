@@ -76,25 +76,13 @@ From the [`example/`](example/) app on Android — enqueue photos and watch the 
 
 ## Installation
 
-Not on pub.dev yet — depend on GitHub until the first publish:
-
 ```yaml
 dependencies:
-  offline_upload_queue:
-    git:
-      url: https://github.com/cengizhankkaya/offline_upload_queue.git
-      ref: main
+  offline_upload_queue: ^0.6.0
 ```
 
 ```bash
 flutter pub get
-```
-
-After publishing to pub.dev you can switch to:
-
-```yaml
-dependencies:
-  offline_upload_queue: ^0.6.0
 ```
 
 Minimum: **Flutter 3.24+**, **Dart 3.12+**. Platforms: **iOS** and **Android** only.
