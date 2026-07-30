@@ -2,6 +2,8 @@
 
 Offline-first file upload queue for Flutter. Uploads survive app kills, flaky networks, and opportunistic OS background wakes.
 
+Maintained by [Cengizhan Kaya](https://github.com/cengizhankkaya).
+
 [![pub.dev](https://img.shields.io/pub/v/offline_upload_queue.svg?style=flat-square)](https://pub.dev/packages/offline_upload_queue)
 [![pub points](https://img.shields.io/pub/points/offline_upload_queue?style=flat-square)](https://pub.dev/packages/offline_upload_queue/score)
 [![CI](https://github.com/cengizhankkaya/offline_upload_queue/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/cengizhankkaya/offline_upload_queue/actions)
@@ -381,7 +383,8 @@ API docs: [pub.dev documentation](https://pub.dev/documentation/offline_upload_q
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Issues](https://github.com/cengizhankkaya/offline_upload_queue/issues)
+- Author: [Cengizhan Kaya](https://github.com/cengizhankkaya)
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT © [Cengizhan Kaya](https://github.com/cengizhankkaya) — see [LICENSE](LICENSE).
