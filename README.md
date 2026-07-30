@@ -76,9 +76,21 @@ From the [`example/`](example/) app on Android — enqueue photos and watch the 
 
 ## Installation
 
-```bash
-flutter pub add offline_upload_queue
+Not on pub.dev yet — depend on GitHub until the first publish:
+
+```yaml
+dependencies:
+  offline_upload_queue:
+    git:
+      url: https://github.com/cengizhankkaya/offline_upload_queue.git
+      ref: main
 ```
+
+```bash
+flutter pub get
+```
+
+After publishing to pub.dev you can switch to:
 
 ```yaml
 dependencies:
