@@ -1,17 +1,30 @@
-# example
+# offline_upload_queue example
 
-A new Flutter project.
+Bu uygulama paketin public API'sini ve platform arka plan kurulumunu gösterir.
 
-## Getting Started
+## Çalıştırma
 
-This project is a starting point for a Flutter application.
+```bash
+# Opsiyonel: kökteki mock sunucu (ExampleRestAdapter için)
+dart run tool/mock_server.dart
 
-A few resources to get you started if this is your first Flutter project:
+cd example
+flutter run
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Ekranlar
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+| Sekme | Ne test eder |
+|---|---|
+| Kuyruk | enqueue, progress, cancel, özet stream'leri |
+| Cellular | `wifiOnly` + `forceUploadOnce` |
+| Hata | kalıcı / geçici hata ve retry |
+| Disk | sandbox kullanımı ve uyarı eşiği |
+| Debug | loglar, pause/resume, purge |
+
+## Platform kurulumu
+
+- **iOS:** `Info.plist` BGTask kimlikleri + `AppDelegate.swift` MethodChannel
+- **Android:** `Workmanager` `callbackDispatcher` + `RECEIVE_BOOT_COMPLETED`
+
+Ayrıntılar için kök [README.md](../README.md) içindeki Background Sync bölümüne bakın.

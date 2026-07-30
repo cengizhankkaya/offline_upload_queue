@@ -1,8 +1,8 @@
 /// Metadata için şifreleme/çözme sağlayan codec arayüzü.
 ///
-/// Eğer veritabanını tamamen (SQLCipher ile) şifrelemek istemiyorsanız
-/// ancak hassas PII verilerini içeren `metadata` alanını korumak
-/// istiyorsanız bu sınıfı kullanarak `UploadQueue`'ya enjekte edebilirsiniz.
+/// Veritabanının tamamını (`encryptionKey` / Sembast codec) şifrelemek
+/// istemiyorsanız, ancak hassas PII içeren `metadata` alanını korumak
+/// istiyorsanız bu sınıfı `UploadQueue`'ya enjekte edin.
 class MetadataCodec {
   /// Orijinal JSON verisini şifreleyerek string'e dönüştürür.
   final String Function(String plainJson) encode;

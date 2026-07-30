@@ -49,8 +49,15 @@ import 'upload_queue_options.dart';
 /// await queue.forceUploadOnce(); // cellular'da bile çalışır (tek seferlik)
 /// ```
 class UploadQueue {
-  late final QueueController _controller;
-  bool _initialized = false;
+  /// `init()` ile oluşturulur, `dispose()` ile `null`'a döner.
+  ///
+  /// Nullable tutulması `dispose()` → `init()` döngüsünün çalışabilmesi için
+  /// zorunludur; `late final` bir alan ikinci `init()` çağrısında
+  /// `LateInitializationError` fırlatırdı.
+  QueueController? _controller;
+
+  /// `init()` öncesi gelen `setBackgroundDeadline` çağrısını taşır.
+  DateTime? _backgroundDeadline;
 
   /// Upload işlemi yapacak adapter (ör. [RestUploadAdapter]).
   final UploadAdapter adapter;
@@ -142,18 +149,26 @@ class UploadQueue {
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
+  /// Kuyruk `init()` edilmiş ve henüz `dispose()` edilmemiş mi?
+  ///
+  /// Arka plan çalıştırıcıları ([BackgroundTaskRunner]) bu bayrağa bakarak
+  /// kuyruğun sahibi olup olmadıklarını belirler: zaten başlatılmış bir
+  /// kuyruğu iş bitiminde `dispose()` etmemeleri gerekir.
+  bool get isInitialized => _controller != null;
+
   /// Kuyruğu başlatır.
   ///
-  /// `init()` çağrılmadan hiçbir metot kullanılamaz.
+  /// `init()` çağrılmadan hiçbir metot kullanılamaz. Zaten başlatılmışsa
+  /// no-op'tur; `dispose()` sonrası yeniden çağrılabilir.
   ///
   /// ## Yapılanlar
   ///
   /// - Argüman doğrulaması (`maxAttempts`, `staleLockThreshold >= heartbeatInterval * 3`)
-  /// - Crash recovery: `uploading → pending` geçişi
+  /// - Worker kilidini alır, ardından crash recovery: `uploading → pending`
   /// - Bağlantı izlemeyi başlatır
   /// - Worker döngüsünü başlatır
   Future<void> init() async {
-    if (_initialized) return;
+    if (_controller != null) return;
 
     final effectiveBackoff =
         backoff ??
@@ -170,7 +185,7 @@ class UploadQueue {
       metadataCodec: metadataCodec,
     );
 
-    _controller = QueueController(
+    final controller = QueueController(
       repository: repo,
       adapter: adapter,
       retryPolicy: RetryPolicy(
@@ -188,8 +203,11 @@ class UploadQueue {
       advanced: advanced,
     );
 
-    await _controller.init();
-    _initialized = true;
+    // init() öncesi bildirilmiş bir arka plan penceresi varsa devret.
+    controller.setBackgroundDeadline(_backgroundDeadline);
+
+    await controller.init();
+    _controller = controller;
   }
 
   // ── Enqueue ───────────────────────────────────────────────────────────────
@@ -204,8 +222,7 @@ class UploadQueue {
     Map<String, dynamic>? metadata,
     int priority = 0,
   }) {
-    _assertInitialized();
-    return _controller.enqueue(
+    return _requireController().enqueue(
       filePath: filePath,
       metadata: metadata,
       priority: priority,
@@ -217,21 +234,25 @@ class UploadQueue {
     List<({String filePath, Map<String, dynamic>? metadata, int priority})>
     items,
   ) {
-    _assertInitialized();
-    return _controller.enqueueBatch(items);
+    return _requireController().enqueueBatch(items);
   }
 
   // ── Control ───────────────────────────────────────────────────────────────
+
+  /// Tek bir görevin anlık durumunu döner; kayıt yoksa `null`.
+  Future<UploadTask?> getTask(String taskId) {
+    return _requireController().getTask(taskId);
+  }
 
   /// `permanentlyFailed` veya `cancelled` görevi tekrar `pending`'e alır.
   ///
   /// `retryCount` ve `nextRetryAt` sıfırlanır — görev ilk kez deneniyormuş
   /// gibi kuyruğun en önüne eklenir.
   ///
-  /// Throws [StateError] if `init()` has not been called.
+  /// Throws [StateError] if `init()` has not been called, the task is missing,
+  /// or its status is not retryable.
   Future<void> retry(String taskId) {
-    _assertInitialized();
-    return _controller.retry(taskId);
+    return _requireController().retry(taskId);
   }
 
   /// Görevi iptal eder. Aktif upload varsa HTTP isteğini keser.
@@ -241,8 +262,7 @@ class UploadQueue {
   ///
   /// Throws [StateError] if `init()` has not been called.
   Future<void> cancel(String taskId) {
-    _assertInitialized();
-    return _controller.cancel(taskId);
+    return _requireController().cancel(taskId);
   }
 
   /// Worker'ı geçici durdurur (in-memory; uygulama yeniden başlatılırsa sıfırlanır).
@@ -250,8 +270,7 @@ class UploadQueue {
   /// Devam eden upload'ı kesmez — yalnızca yeni görev almayı engeller.
   /// `watchSummary()` üzerinden `isPaused: true` olarak yansır.
   void pause() {
-    _assertInitialized();
-    _controller.pause();
+    _requireController().pause();
   }
 
   /// Duraklatılmış worker'ı yeniden başlatır.
@@ -259,8 +278,7 @@ class UploadQueue {
   /// `pause()` aktif değilse no-op. `watchSummary()` üzerinden
   /// `isPaused: false` olarak yansır.
   Future<void> resume() async {
-    _assertInitialized();
-    _controller.resume();
+    _requireController().resume();
   }
 
   /// `wifiOnly: true` iken çağrı anındaki tüm `pending` görevleri mevcut
@@ -268,24 +286,22 @@ class UploadQueue {
   ///
   /// `pause()` aktifse no-op döner (`pause() > forceUploadOnce()`).
   Future<void> forceUploadOnce() {
-    _assertInitialized();
-    return _controller.forceUploadOnce();
+    return _requireController().forceUploadOnce();
   }
 
   // ── Observe ───────────────────────────────────────────────────────────────
 
   /// Kuyruğun anlık özetini yayınlayan reaktif stream.
   ///
-  /// `UploadTasks` tablosundaki herhangi bir değişiklik sonrası otomatik
+  /// `tasks` store'undaki herhangi bir değişiklik sonrası otomatik
   /// yeni bir [QueueSummary] yayınlar.
   Stream<QueueSummary> watchSummary() {
-    _assertInitialized();
-    return _controller.watchSummary();
+    return _requireController().watchSummary();
   }
 
   /// Filtrelenmiş görev listesini yayınlayan reaktif stream.
   ///
-  /// `UploadTasks` tablosundaki herhangi bir değişiklik sonrası otomatik
+  /// `tasks` store'undaki herhangi bir değişiklik sonrası otomatik
   /// yeni bir liste yayınlar.
   ///
   /// ## Önemli
@@ -313,8 +329,7 @@ class UploadQueue {
     int limit = 50,
     int offset = 0,
   }) {
-    _assertInitialized();
-    return _controller.watchTasks(
+    return _requireController().watchTasks(
       statuses: statuses,
       limit: limit,
       offset: offset,
@@ -330,15 +345,13 @@ class UploadQueue {
   /// **Performans:** Listener yokken `onProgress` callback'i adapter'a hiç
   /// geçirilmez — gereksiz chunk başına closure maliyeti yoktur.
   Stream<double> watchProgress(String taskId) {
-    _assertInitialized();
-    return _controller.watchProgress(taskId);
+    return _requireController().watchProgress(taskId);
   }
 
   /// Tüm kuyruğun toplam ilerleme oranını (0.0–1.0) yayınlayan stream.
   /// (completed) / (pending + uploading + failed + completed)
   Stream<double> watchOverallProgress() {
-    _assertInitialized();
-    return _controller.watchOverallProgress();
+    return _requireController().watchOverallProgress();
   }
 
   // ── Purge ─────────────────────────────────────────────────────────────────
@@ -349,8 +362,7 @@ class UploadQueue {
   /// silinebilir. Aktif (`pending`, `uploading`, `failed`) görevlere uygulamak
   /// için önce `cancel()` çağırın.
   Future<void> purge(String taskId) {
-    _assertInitialized();
-    return _controller.purge(taskId);
+    return _requireController().purge(taskId);
   }
 
   /// Tüm `permanentlyFailed` görevleri ve sandbox kopyalarını siler.
@@ -358,14 +370,12 @@ class UploadQueue {
   /// Tipik kullanım: kullanıcıya "N görev kalıcı hatayla başarısız oldu —
   /// temizlemek istiyor musunuz?" sorusu ardından.
   Future<void> purgeAllFailed() {
-    _assertInitialized();
-    return _controller.purgeAllFailed();
+    return _requireController().purgeAllFailed();
   }
 
   /// Tüm `cancelled` görevleri ve sandbox kopyalarını siler.
   Future<void> purgeAllCancelled() {
-    _assertInitialized();
-    return _controller.purgeAllCancelled();
+    return _requireController().purgeAllCancelled();
   }
 
   /// Tüm `completed` görevlerin DB kayıtlarını siler.
@@ -373,8 +383,7 @@ class UploadQueue {
   /// Sandbox kopyaları zaten `completed` anında silinmiştir;
   /// bu çağrı yalnızca DB satırlarının birikmesini önler.
   Future<void> purgeAllCompleted() {
-    _assertInitialized();
-    return _controller.purgeAllCompleted();
+    return _requireController().purgeAllCompleted();
   }
 
   /// Kuyruktaki belirli durumdaki tüm görevleri temizler.
@@ -382,8 +391,7 @@ class UploadQueue {
   /// Varsayılan olarak `permanentlyFailed`, `cancelled` ve `completed` durumlarını kapsar.
   /// `includePending: true` ise `pending` görevler de silinir.
   Future<void> purgeAll({bool includePending = false}) {
-    _assertInitialized();
-    return _controller.purgeAll(includePending: includePending);
+    return _requireController().purgeAll(includePending: includePending);
   }
 
   // ── Dispose ───────────────────────────────────────────────────────────────
@@ -391,11 +399,20 @@ class UploadQueue {
   /// Kaynakları serbest bırakır.
   ///
   /// Aktif upload varsa token iptal edilir ve görev `pending`'e döndürülür.
-  /// Aynı `boxName` ile sonradan yeniden `init()` çağrılabilir.
+  /// Aynı örnek üzerinde sonradan yeniden `init()` çağrılabilir.
   Future<void> dispose() async {
-    if (!_initialized) return;
-    await _controller.dispose();
-    _initialized = false;
+    final controller = _controller;
+    if (controller == null) return;
+    _controller = null;
+    await controller.dispose();
+  }
+
+  /// Aktif upload'ları iptal edip `pending`'e döndürür; kuyruk açık kalır.
+  ///
+  /// iOS `BGTaskScheduler` `expirationHandler` için kullanın — paylaşılan
+  /// foreground kuyruğunu `dispose()` etmeyin.
+  Future<void> abortActiveUploads() {
+    return _requireController().abortActiveUploads();
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -406,20 +423,21 @@ class UploadQueue {
   /// OS'un kalan bütçesi içinde `authTimeout`'un taşmasını önlemek için
   /// [BackgroundTaskRunner] tarafından otomatik olarak çağrılır.
   ///
-  /// `deadline` `null` geçilirse sınır kaldırılır.
-  /// Doğrudan çağırmanız gerekmez — [BackgroundTaskRunner.run] bunu yönetir.
+  /// `init()` öncesi çağrılırsa değer saklanır ve `init()` sırasında
+  /// controller'a aktarılır. `deadline` `null` geçilirse sınır kaldırılır.
   void setBackgroundDeadline(DateTime? deadline) {
-    if (_initialized) {
-      _controller.setBackgroundDeadline(deadline);
-    }
+    _backgroundDeadline = deadline;
+    _controller?.setBackgroundDeadline(deadline);
   }
 
-  void _assertInitialized() {
-    if (!_initialized) {
+  QueueController _requireController() {
+    final controller = _controller;
+    if (controller == null) {
       throw StateError(
         'UploadQueue.init() çağrılmadan kullanılamaz. '
         'await queue.init() ile başlatın.',
       );
     }
+    return controller;
   }
 }

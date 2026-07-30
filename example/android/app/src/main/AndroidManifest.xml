@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Workmanager: cihaz yeniden açılınca OneOff zincirini yeniden kurabilsin -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:label="example"
         android:name="${applicationName}"

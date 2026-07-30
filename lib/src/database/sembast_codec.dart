@@ -6,8 +6,9 @@ import 'package:encrypt/encrypt.dart';
 import 'package:sembast/sembast.dart';
 
 /// Bu codec sembast kaynak deposundaki örnek koda (Salsa20+SHA256) dayanır.
-/// Bağımsız güvenlik denetiminden geçmemiştir. HIPAA/GDPR gibi senaryolar
-/// için bağımsız denetlenmiş bir şifreleme çözümü tercih edilmelidir.
+/// Bağımsız güvenlik denetiminden geçmemiştir; ayrıca kimlik doğrulama
+/// (MAC/AEAD) yoktur — veri kurcalanması saptanmaz. HIPAA/GDPR gibi
+/// senaryolar için bağımsız denetlenmiş bir şifreleme çözümü tercih edin.
 class _EncryptEncoder extends Converter<Object?, String> {
   final Salsa20 salsa20;
   _EncryptEncoder(this.salsa20);

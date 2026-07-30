@@ -93,13 +93,10 @@ class ControllableUploadAdapter implements UploadAdapter {
     final completer = Completer<UploadResult>();
     _pauseCompleters[taskId] = completer;
 
-    // Cancel token iptal edildiğinde completer'ı hata ile kapat
+    // RestUploadAdapter ile aynı sözleşme: iptalde exception değil failure dön.
     cancelToken?.registerOnCancel(() {
       if (!completer.isCompleted) {
-        completer.completeError(
-          Exception('Upload iptal edildi: $taskId'),
-          StackTrace.current,
-        );
+        completer.complete(const UploadResult.failure(FailureType.unknown));
       }
     });
 

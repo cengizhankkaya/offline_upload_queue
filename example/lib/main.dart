@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:workmanager/workmanager.dart';
-import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:workmanager/workmanager.dart';
 
 import 'package:offline_upload_queue/offline_upload_queue.dart';
 
@@ -141,8 +143,8 @@ void main() async {
       onAppRefresh: () => BackgroundTaskRunner.run(uploadQueue),
       onProcessing: () => BackgroundTaskRunner.run(uploadQueue),
       onExpiration: () {
-        // Sistem süresi bitince upload'ı iptal edip pending'e döndür
-        uploadQueue.dispose();
+        // Paylaşılan foreground kuyruğunu dispose etme — yalnızca aktif upload'ı kes.
+        unawaited(uploadQueue.abortActiveUploads());
       },
     );
   }

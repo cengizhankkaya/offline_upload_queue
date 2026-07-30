@@ -2,7 +2,7 @@
 ///
 /// Tüm `UploadStatus` sayaçlarını, duraklama bayraklarını ve tahmini disk
 /// kullanımını içerir. `watchSummary()`, sembast'ın `onSnapshots()` stream'ine
-/// dayandığı için `UploadTasks` store'undaki **herhangi bir yazım** sonrası
+/// dayandığı için `tasks` store'undaki **herhangi bir yazım** sonrası
 /// otomatik yeni bir `QueueSummary` yayınlar.
 ///
 /// ## Örnek
@@ -40,8 +40,8 @@ class QueueSummary {
 
   /// Yalnızca `onAuthExpired` callback'i çalışırken `true`.
   ///
-  /// Bu bayrak `true` iken worker `authExpired` görevi için callback'in
-  /// sonucunu beklemektedir; diğer görevler normal şekilde işlenir.
+  /// Bu bayrak `true` iken tek worker auth callback'ini `await` ettiği için
+  /// diğer görevler de callback bitene (veya timeout'a) kadar bekler.
   final bool pausedDueToAuth;
 
   /// `fileSizeBytes` kolonunun toplamı — dosya sistemine dokunmadan hesaplanır.

@@ -177,6 +177,7 @@ void main() {
 
       // Task eklendi ama worker başlamadan önce silindi
       await repo.enqueue(taskId: 'ghost-task', filePath: fakeFilePath);
+      await repo.markCancelled('ghost-task');
       await repo.purge('ghost-task');
 
       final controller = makeController(

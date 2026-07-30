@@ -33,16 +33,7 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
 
   @override
   Future<void> init() async {
-    final stuck = _tasks.values
-        .where((t) => t.status == UploadStatus.uploading)
-        .toList();
-    for (final task in stuck) {
-      _tasks[task.taskId] = task.copyWith(
-        status: UploadStatus.pending,
-        nextRetryAt: null,
-      );
-    }
-    _notify();
+    // DB açma eşdeğeri — recovery [recoverStuckUploads] ile yapılır.
   }
 
   // ── Enqueue ───────────────────────────────────────────────────────────────
@@ -75,13 +66,17 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   // ── Query ─────────────────────────────────────────────────────────────────
 
   @override
-  Future<UploadTask?> getNextPending(DateTime now) async {
+  Future<UploadTask?> getNextPending(
+    DateTime now, {
+    Set<String>? onlyTaskIds,
+  }) async {
     final candidates =
         _tasks.values
             .where(
               (t) =>
                   (t.status == UploadStatus.pending ||
                       t.status == UploadStatus.failed) &&
+                  (onlyTaskIds == null || onlyTaskIds.contains(t.taskId)) &&
                   (t.nextRetryAt == null ||
                       t.nextRetryAt!.isBefore(now) ||
                       t.nextRetryAt == now),
@@ -94,6 +89,9 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
           });
     return candidates.isEmpty ? null : candidates.first;
   }
+
+  @override
+  Future<UploadTask?> getTask(String taskId) async => _tasks[taskId];
 
   // ── State transitions ─────────────────────────────────────────────────────
 
@@ -120,16 +118,29 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
     String? errorMessage,
     DateTime? nextRetryAt,
   }) async {
-    _update(
-      taskId,
-      (t) => t.copyWith(
-        status: UploadStatus.failed,
-        failureType: failureType,
-        errorMessage: errorMessage,
-        retryCount: t.retryCount + 1,
-        nextRetryAt: nextRetryAt,
-      ),
+    final existing = _tasks[taskId];
+    if (existing == null) return;
+    if (existing.status == UploadStatus.cancelled ||
+        existing.status == UploadStatus.completed ||
+        existing.status == UploadStatus.permanentlyFailed) {
+      return;
+    }
+    _tasks[taskId] = UploadTask(
+      taskId: existing.taskId,
+      filePath: existing.filePath,
+      sequenceNumber: existing.sequenceNumber,
+      status: UploadStatus.failed,
+      failureType: failureType,
+      retryCount: existing.retryCount + 1,
+      createdAt: existing.createdAt,
+      priority: existing.priority,
+      fileSizeBytes: existing.fileSizeBytes,
+      metadata: existing.metadata,
+      checksum: existing.checksum,
+      errorMessage: errorMessage,
+      nextRetryAt: nextRetryAt,
     );
+    _notify();
   }
 
   @override
@@ -216,7 +227,29 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
   Stream<void> watchLockUpdates() => const Stream.empty();
 
   @override
-  Future<void> recoverStuckUploads() => init();
+  Future<void> recoverStuckUploads() async {
+    final stuck = _tasks.values
+        .where((t) => t.status == UploadStatus.uploading)
+        .toList();
+    for (final task in stuck) {
+      _tasks[task.taskId] = UploadTask(
+        taskId: task.taskId,
+        filePath: task.filePath,
+        sequenceNumber: task.sequenceNumber,
+        status: UploadStatus.pending,
+        retryCount: task.retryCount,
+        createdAt: task.createdAt,
+        priority: task.priority,
+        fileSizeBytes: task.fileSizeBytes,
+        metadata: task.metadata,
+        checksum: task.checksum,
+        failureType: task.failureType,
+        errorMessage: task.errorMessage,
+        nextRetryAt: null,
+      );
+    }
+    if (stuck.isNotEmpty) _notify();
+  }
 
   @override
   Future<int> getNextSequenceNumber() async {
@@ -340,10 +373,25 @@ class InMemoryPersistenceRepository implements PersistenceRepository {
     _progressControllers[taskId]?.add(ratio);
   }
 
+  @override
+  bool hasProgressListener(String taskId) {
+    final ctrl = _progressControllers[taskId];
+    return ctrl != null && ctrl.hasListener;
+  }
+
   // ── Purge ─────────────────────────────────────────────────────────────────
 
   @override
   Future<void> purge(String taskId) async {
+    final task = _tasks[taskId];
+    if (task == null) return;
+    if (task.status != UploadStatus.permanentlyFailed &&
+        task.status != UploadStatus.cancelled) {
+      throw StateError(
+        'purge() yalnızca permanentlyFailed veya cancelled görevler için '
+        'çağrılabilir (şu anki durum: ${task.status}).',
+      );
+    }
     _tasks.remove(taskId);
     _notify();
   }

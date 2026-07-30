@@ -52,6 +52,9 @@ class SembastPersistenceRepository implements PersistenceRepository {
   /// Worker kilidi — tek kayıt, key = 'lock'
   final _lockStore = stringMapStoreFactory.store('worker_lock');
 
+  /// Meta (sequence sayacı vb.) — key = 'seq'
+  final _metaStore = stringMapStoreFactory.store('meta');
+
   /// Progress stream controller'ları: taskId → controller
   final _progressControllers = <String, StreamController<double>>{};
 
@@ -63,10 +66,7 @@ class SembastPersistenceRepository implements PersistenceRepository {
 
   // ── Init & Recovery ──────────────────────────────────────────────────────
 
-  /// Veritabanını açar ve crash recovery yapar.
-  ///
-  /// `uploading` durumundaki görevleri `pending`'e döndürür ve
-  /// `nextRetryAt`'ı null yapar.
+  /// Veritabanını açar. Crash recovery için [recoverStuckUploads] ayrı çağrılır.
   @override
   Future<void> init() async {
     final dbFolder = await getApplicationSupportDirectory();
@@ -77,8 +77,6 @@ class SembastPersistenceRepository implements PersistenceRepository {
         : null;
 
     _db = await databaseFactoryIo.openDatabase(dbPath, codec: codec);
-
-    await recoverStuckUploads();
   }
 
   /// `uploading` durumundaki tüm görevleri `pending`'e döndürür.
@@ -118,14 +116,21 @@ class SembastPersistenceRepository implements PersistenceRepository {
     // Sequence numarası ve insert tek atomik transaction içinde:
     // Aynı process'teki concurrent Future'ların interleave etmesini engeller.
     await _db.transaction((txn) async {
-      // MAX(sequenceNumber) + 1 — sembast transactional read garantili
-      final allSnapshots = await _taskStore.find(txn);
-      final nextSeq = allSnapshots.isEmpty
-          ? 1
-          : allSnapshots
-                    .map((s) => (s.value['sequenceNumber'] as int?) ?? 0)
-                    .reduce((a, b) => a > b ? a : b) +
-                1;
+      // O(1) sequence: meta store sayacı (eski DB'lerde MAX+1 ile bootstrap)
+      final seqRecord = await _metaStore.record('seq').get(txn);
+      int nextSeq;
+      if (seqRecord != null) {
+        nextSeq = ((seqRecord['value'] as int?) ?? 0) + 1;
+      } else {
+        final allSnapshots = await _taskStore.find(txn);
+        nextSeq = allSnapshots.isEmpty
+            ? 1
+            : allSnapshots
+                      .map((s) => (s.value['sequenceNumber'] as int?) ?? 0)
+                      .reduce((a, b) => a > b ? a : b) +
+                  1;
+      }
+      await _metaStore.record('seq').put(txn, {'value': nextSeq});
 
       // metadata: MetadataCodec varsa JSON string üzerinden encode, yoksa direkt Map
       Object? storedMetadata;
@@ -179,7 +184,10 @@ class SembastPersistenceRepository implements PersistenceRepository {
   /// `status = pending` VE (`nextRetryAt IS NULL` VEYA `nextRetryAt <= now`)
   /// koşuluna uyan, `priority DESC, sequenceNumber ASC` sıralı ilk görevi döner.
   @override
-  Future<UploadTask?> getNextPending(DateTime now) async {
+  Future<UploadTask?> getNextPending(
+    DateTime now, {
+    Set<String>? onlyTaskIds,
+  }) async {
     final allPending = await _taskStore.find(
       _db,
       finder: Finder(
@@ -192,6 +200,9 @@ class SembastPersistenceRepository implements PersistenceRepository {
 
     final candidates =
         allPending.where((s) {
+          if (onlyTaskIds != null && !onlyTaskIds.contains(s.key)) {
+            return false;
+          }
           final nextRetryAtStr = s.value['nextRetryAt'] as String?;
           if (nextRetryAtStr == null) return true;
           return !DateTime.parse(nextRetryAtStr).isAfter(now);
@@ -207,6 +218,13 @@ class SembastPersistenceRepository implements PersistenceRepository {
 
     if (candidates.isEmpty) return null;
     return _snapshotToTask(candidates.first.key, candidates.first.value);
+  }
+
+  @override
+  Future<UploadTask?> getTask(String taskId) async {
+    final record = await _taskStore.record(taskId).get(_db);
+    if (record == null) return null;
+    return _snapshotToTask(taskId, record);
   }
 
   // ── State transitions ─────────────────────────────────────────────────────
@@ -237,6 +255,14 @@ class SembastPersistenceRepository implements PersistenceRepository {
     await _db.transaction((txn) async {
       final record = await _taskStore.record(taskId).get(txn);
       if (record == null) return;
+      final statusIdx = (record['status'] as int?) ?? 0;
+      final status = UploadStatus.values[statusIdx];
+      // Terminal durumları failed ile ezme (cancel() yarışı)
+      if (status == UploadStatus.cancelled ||
+          status == UploadStatus.completed ||
+          status == UploadStatus.permanentlyFailed) {
+        return;
+      }
       final current = Map<String, Object?>.from(record);
       current['status'] = UploadStatus.failed.index;
       current['failureType'] = failureType.index;
@@ -303,6 +329,10 @@ class SembastPersistenceRepository implements PersistenceRepository {
   /// depolanan değer `enqueue()` transaction'ı tarafından belirlenir.
   @override
   Future<int> getNextSequenceNumber() async {
+    final seqRecord = await _metaStore.record('seq').get(_db);
+    if (seqRecord != null) {
+      return ((seqRecord['value'] as int?) ?? 0) + 1;
+    }
     final all = await _taskStore.find(_db);
     if (all.isEmpty) return 1;
     return all
@@ -357,9 +387,14 @@ class SembastPersistenceRepository implements PersistenceRepository {
 
   @override
   Future<void> updateHeartbeat(String ownerId, DateTime acquiredAt) async {
-    await _lockStore.record('lock').put(_db, {
-      'acquiredAt': acquiredAt.toIso8601String(),
-      'ownerId': ownerId,
+    await _db.transaction((txn) async {
+      final existing = await _lockStore.record('lock').get(txn);
+      if (existing == null) return;
+      if (existing['ownerId'] != ownerId) return;
+      await _lockStore.record('lock').put(txn, {
+        'acquiredAt': acquiredAt.toIso8601String(),
+        'ownerId': ownerId,
+      });
     });
   }
 
@@ -475,6 +510,12 @@ class SembastPersistenceRepository implements PersistenceRepository {
     _progressControllers[taskId]?.add(ratio);
   }
 
+  @override
+  bool hasProgressListener(String taskId) {
+    final ctrl = _progressControllers[taskId];
+    return ctrl != null && ctrl.hasListener;
+  }
+
   // ── Purge ─────────────────────────────────────────────────────────────────
 
   @override
@@ -482,11 +523,19 @@ class SembastPersistenceRepository implements PersistenceRepository {
     final record = await _taskStore.record(taskId).get(_db);
     if (record == null) return;
 
+    final statusIdx = (record['status'] as int?) ?? 0;
+    final status = UploadStatus.values[statusIdx];
+    if (status != UploadStatus.permanentlyFailed &&
+        status != UploadStatus.cancelled) {
+      throw StateError(
+        'purge() yalnızca permanentlyFailed veya cancelled görevler için '
+        'çağrılabilir (şu anki durum: $status). Önce cancel() çağırın.',
+      );
+    }
+
     await _deleteSandboxFile(record['filePath'] as String?);
     await _taskStore.record(taskId).delete(_db);
-    _cleanupProgressController(
-      taskId,
-    ); // Silinen görevin progress controller'nı temizle
+    _cleanupProgressController(taskId);
   }
 
   @override

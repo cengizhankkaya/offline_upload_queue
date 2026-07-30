@@ -99,8 +99,8 @@ class RestUploadAdapter implements UploadAdapter {
       );
     } on DioException catch (e) {
       if (CancelToken.isCancel(e)) {
-        // QueueController cancel() çağrısı zaten DB durumunu `cancelled`
-        // yapacak — burada FailureType önemsiz.
+        // Exception fırlatılmaz; failure döner. QueueController,
+        // cancelToken.isCancelled kontrolüyle DB'yi failed ile ezmez.
         return const UploadResult.failure(FailureType.unknown);
       }
       return UploadResult.failure(_classifyDioError(e));

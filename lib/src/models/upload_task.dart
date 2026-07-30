@@ -1,5 +1,7 @@
 import 'upload_status.dart';
 
+const Object _copyWithUnset = Object();
+
 /// Bir yükleme görevinin anlık görüntüsü — UI ve `watchTasks()` için dışa açılır.
 ///
 /// Veritabanı implementasyonundan bağımsız, immutable bir
@@ -70,19 +72,23 @@ class UploadTask {
   });
 
   /// Kısmi kopyalama — değiştirilmek istenmeyen alanlar orijinalden taşınır.
+  ///
+  /// Nullable alanları (`failureType`, `nextRetryAt`, `errorMessage`,
+  /// `checksum`, `metadata`) açıkça `null` yapmak için ilgili parametreyi
+  /// `null` geçin.
   UploadTask copyWith({
     String? taskId,
     String? filePath,
     int? sequenceNumber,
     UploadStatus? status,
-    FailureType? failureType,
+    Object? failureType = _copyWithUnset,
     int? retryCount,
-    Map<String, dynamic>? metadata,
-    String? checksum,
-    int? fileSizeBytes,
-    String? errorMessage,
+    Object? metadata = _copyWithUnset,
+    Object? checksum = _copyWithUnset,
+    Object? fileSizeBytes = _copyWithUnset,
+    Object? errorMessage = _copyWithUnset,
     DateTime? createdAt,
-    DateTime? nextRetryAt,
+    Object? nextRetryAt = _copyWithUnset,
     int? priority,
   }) {
     return UploadTask(
@@ -90,14 +96,26 @@ class UploadTask {
       filePath: filePath ?? this.filePath,
       sequenceNumber: sequenceNumber ?? this.sequenceNumber,
       status: status ?? this.status,
-      failureType: failureType ?? this.failureType,
+      failureType: identical(failureType, _copyWithUnset)
+          ? this.failureType
+          : failureType as FailureType?,
       retryCount: retryCount ?? this.retryCount,
-      metadata: metadata ?? this.metadata,
-      checksum: checksum ?? this.checksum,
-      fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
-      errorMessage: errorMessage ?? this.errorMessage,
+      metadata: identical(metadata, _copyWithUnset)
+          ? this.metadata
+          : metadata as Map<String, dynamic>?,
+      checksum: identical(checksum, _copyWithUnset)
+          ? this.checksum
+          : checksum as String?,
+      fileSizeBytes: identical(fileSizeBytes, _copyWithUnset)
+          ? this.fileSizeBytes
+          : fileSizeBytes as int?,
+      errorMessage: identical(errorMessage, _copyWithUnset)
+          ? this.errorMessage
+          : errorMessage as String?,
       createdAt: createdAt ?? this.createdAt,
-      nextRetryAt: nextRetryAt ?? this.nextRetryAt,
+      nextRetryAt: identical(nextRetryAt, _copyWithUnset)
+          ? this.nextRetryAt
+          : nextRetryAt as DateTime?,
       priority: priority ?? this.priority,
     );
   }

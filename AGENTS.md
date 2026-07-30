@@ -15,5 +15,16 @@ detayı asama dosyasında yoksa, plan-2.md içinde ilgili "Bölüm N"
 başlığını ara.
 
 ## Şu an aktif aşama
-Aşama 2 — Dayanıklılık ve Hata Yönetimi (docs/asama-2-dayaniklilik.md).
-Geçiş (Drift -> Sembast) tamamlandı ve cross-isolate semantiği Alternatif A (handoff) olarak doğrulandı.
+Aşama 5 — Yayın sonrası (docs/asama-5-yayin-sonrasi.md).
+
+Aşama 1–4 tamamlandı:
+- Aşama 1: çekirdek kuyruk + PersistenceRepository
+- Aşama 2: dayanıklılık / hata yönetimi
+- Aşama 3: arka plan (iOS BGTaskScheduler + Android Workmanager) + kilit
+- Aşama 4: cilalama, example, README, manuel checklist
+
+Notlar:
+- Persistence: Drift → Sembast geçişi tamamlandı; cross-isolate semantiği
+  Alternatif A (handoff) olarak doğrulandı.
+- `copyToSandbox`: hardlink-önce (`ln`) + byte-kopyalama fallback v1'de
+  (shell `ln`; native platform channel yok).

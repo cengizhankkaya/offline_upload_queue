@@ -39,8 +39,8 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # Job 2: Cross-isolate tests (separate job — §1 / test #12 requirement)
   #
-  # Tests tagged @Tags(['cross_isolate']) spin up real Dart Isolates + a shared
-  # SQLite WAL database. Running in a separate job prevents flaky cross-isolate
+  # Tests tagged @Tags(['cross_isolate']) exercise Sembast cross-isolate /
+  # handoff semantics. Running in a separate job prevents flaky isolate
   # failures from obscuring regressions in the main test suite.
   # ─────────────────────────────────────────────────────────────────────────────
   cross_isolate_test:

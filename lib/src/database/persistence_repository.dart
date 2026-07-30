@@ -14,10 +14,12 @@ import '../models/upload_task.dart';
 /// - [SembastPersistenceRepository]: Gerçek sembast dosya store'u (production)
 /// - `InMemoryPersistenceRepository` (`test/helpers/`): Birim testler için
 abstract class PersistenceRepository {
-  /// Depolamayı başlatır ve crash recovery yapar.
+  /// Depolamayı açar (dosya/DB bağlantısı).
   ///
-  /// `uploading` durumundaki görevleri `pending`'e döndürür ve
-  /// `nextRetryAt = null` yapar (backoff beklemeden hemen alınabilir olsun).
+  /// Crash recovery ([recoverStuckUploads]) bu metotta **yapılmaz** —
+  /// worker kilidi alındıktan sonra [QueueController] tarafından çağrılır.
+  /// Böylece başka bir worker aktif yükleme yapıyorken görevler elinden
+  /// alınmaz.
   Future<void> init();
 
   /// Yeni bir görev kuyruğa ekler ve oluşturulan [UploadTask]'ı döner.
@@ -39,10 +41,19 @@ abstract class PersistenceRepository {
 
   /// Sıradaki işlenebilir görevi döner.
   ///
-  /// `status = pending` VE (`nextRetryAt IS NULL` VEYA `nextRetryAt <= now`)
-  /// koşuluna uyan, `sequenceNumber ASC` sıralı ilk görevi döner.
+  /// `status = pending|failed` VE (`nextRetryAt IS NULL` VEYA `nextRetryAt <= now`)
+  /// koşuluna uyan, `priority DESC, sequenceNumber ASC` sıralı ilk görevi döner.
   /// Yoksa `null` döner.
-  Future<UploadTask?> getNextPending(DateTime now);
+  ///
+  /// [onlyTaskIds] verilirse yalnızca bu kimlikler arasından seçilir
+  /// (`forceUploadOnce` wifiOnly bypass için).
+  Future<UploadTask?> getNextPending(
+    DateTime now, {
+    Set<String>? onlyTaskIds,
+  });
+
+  /// Tek bir görevi kimliğine göre döner; yoksa `null`.
+  Future<UploadTask?> getTask(String taskId);
 
   /// Görevi `uploading` durumuna geçirir.
   Future<void> markUploading(String taskId);
@@ -87,7 +98,8 @@ abstract class PersistenceRepository {
 
   /// Worker heartbeat zamanını günceller.
   ///
-  /// [ownerId]: worker/isolate kimliği (debug amaçlı).
+  /// Yalnızca kilidin mevcut [ownerId] sahibi için yazılmalıdır;
+  /// sahiplik uyuşmuyorsa no-op.
   Future<void> updateHeartbeat(String ownerId, DateTime acquiredAt);
 
   /// Atomik koşullu UPDATE ile worker kilidini almayı dener.
@@ -113,7 +125,7 @@ abstract class PersistenceRepository {
 
   /// Kuyruğun anlık özetini yayınlayan reactive stream.
   ///
-  /// `UploadTasks` tablosundaki **herhangi bir yazım** sonrası otomatik
+  /// `tasks` store'undaki **herhangi bir yazım** sonrası otomatik
   /// yeni bir [QueueSummary] yayınlar.
   Stream<QueueSummary> watchSummary({
     bool isPaused = false,
@@ -140,10 +152,15 @@ abstract class PersistenceRepository {
   /// Upload ilerleme değerini günceller (`QueueController` tarafından çağrılır).
   void updateProgress(String taskId, double ratio);
 
+  /// [watchProgress] stream'inin aktif dinleyicisi var mı?
+  ///
+  /// `true` ise adapter'a `onProgress` callback'i geçirilmelidir.
+  bool hasProgressListener(String taskId);
+
   /// Tek bir görevi ve varsa sandbox kopyasını kalıcı olarak siler.
   ///
   /// Yalnızca `permanentlyFailed` veya `cancelled` durumundaki görevler
-  /// silinebilir.
+  /// silinebilir. Diğer durumlarda [StateError] fırlatılır.
   Future<void> purge(String taskId);
 
   /// Tüm `permanentlyFailed` görevleri ve ilişkili sandbox kopyalarını siler.

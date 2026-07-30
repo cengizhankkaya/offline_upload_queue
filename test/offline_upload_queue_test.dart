@@ -372,12 +372,16 @@ void main() {
       },
     );
 
-    test('init() uploading → pending recovery yapar', () async {
+    test('recoverStuckUploads() uploading → pending recovery yapar', () async {
       await repo.enqueue(taskId: 'task-7', filePath: fakeFilePath);
       await repo.markUploading('task-7');
       expect(repo.taskFor('task-7')?.status, UploadStatus.uploading);
 
+      // init() yalnızca depolamayı açar; recovery kilit sonrası ayrı çağrılır.
       await repo.init();
+      expect(repo.taskFor('task-7')?.status, UploadStatus.uploading);
+
+      await repo.recoverStuckUploads();
       expect(repo.taskFor('task-7')?.status, UploadStatus.pending);
       expect(repo.taskFor('task-7')?.nextRetryAt, isNull);
     });
@@ -486,6 +490,7 @@ void main() {
           filePath: fakeFilePath,
           fileSizeBytes: 0,
         );
+        await repo.markCancelled('disk-trigger');
         await repo.purge('disk-trigger');
 
         final summary = await repo.watchSummary().first;

@@ -105,10 +105,11 @@ Tasks flow sequentially through a strictly defined state machine. **Only one fil
 
 ### ⚠️ Storage Cost & Sandboxing
 
-By default, the queue operates with `copyToSandbox: true`. This means every enqueued file is copied to an internal, private directory. 
+By default, the queue operates with `copyToSandbox: true`. Each enqueued file is placed under an internal, private sandbox directory so uploads survive deletion of the original.
 
 * **Advantage:** If the user deletes the original photo from their gallery before the upload finishes, the upload still succeeds.
-* **Trade-off:** Disk usage is roughly **doubled** for pending tasks.
+* **How copy works:** On non-Windows platforms the queue first tries a hardlink (`ln`) on the same volume (no extra disk blocks). If that fails (cross-volume, unsupported FS, Windows), it falls back to a real byte copy — disk usage is then roughly **doubled** for pending tasks until the original is removed.
+* **Metrics:** `estimatedDiskUsageBytes` sums logical sandbox file sizes (conservative when hardlinks succeed).
 
 > **Pro-Tip:** Monitor disk usage by providing an `UploadQueueAdvancedOptions(diskUsageWarningBytes: ...)` to warn users if the offline queue is taking up too much space.
 
@@ -150,7 +151,8 @@ BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.example.app.upload_p
 IosBackgroundChannel.instance.setMethodCallHandler(
   onAppRefresh: () => BackgroundTaskRunner.run(queue),
   onProcessing: () => BackgroundTaskRunner.run(queue),
-  onExpiration: () { queue.dispose(); },
+  // Paylaşılan foreground kuyruğunu dispose etmeyin:
+  onExpiration: () { queue.abortActiveUploads(); },
 );
 ```
 
@@ -158,8 +160,9 @@ IosBackgroundChannel.instance.setMethodCallHandler(
 
 **1. Update `AndroidManifest.xml`**
 ```xml
+<!-- Workmanager boot sonrası zinciri yeniden kurabilsin -->
 <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+<!-- Not: Bu paket foreground service kullanmaz; FGS izni gerekmez. -->
 ```
 
 **2. Configure the Dispatcher in Dart**

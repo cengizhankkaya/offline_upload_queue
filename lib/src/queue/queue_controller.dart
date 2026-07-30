@@ -72,8 +72,8 @@ class QueueController {
   // ── Worker trigger ────────────────────────────────────────────────────────────
   final _triggerController = StreamController<void>.broadcast();
 
-  // Progress stream controller referansları (hasListener kontrolü için)
-  final _progressControllers = <String, StreamController<double>>{};
+  /// pause/resume/auth bayrak değişikliklerini watchSummary abonelerine iletir.
+  final _flagsSignal = StreamController<void>.broadcast();
 
   QueueController({
     required PersistenceRepository repository,
@@ -142,13 +142,19 @@ class QueueController {
       );
     }
 
-    // Crash recovery: uploading → pending + kilit temizliği (bkz. §4 Kritik kural #3)
+    // DB'yi aç — crash recovery kilit alındıktan sonra yapılır
+    // (aktif başka worker'ın uploading görevini çalmamak için).
     await _repo.init();
 
     // ── Kilit alma (bkz. §7 — atomik koşullu UPDATE)
     // staleLockThreshold kadar yeni heartbeat'e sahip bir lock varsa geri çekil
     // ve heartbeat aralığıyla periyodik olarak tekrar dene.
     await _acquireLockWithRetry();
+
+    // Kilit alındıysa stuck uploading → pending recovery
+    if (_lockAcquired) {
+      await _repo.recoverStuckUploads();
+    }
 
     // Başarıyla init edildi — boxName'i sete ekle
     _activeBoxNames.add(_boxName);
@@ -337,9 +343,28 @@ class QueueController {
     return ids;
   }
 
+  /// Tek bir görevin anlık durumunu döner; yoksa `null`.
+  Future<UploadTask?> getTask(String taskId) {
+    _assertDisposed();
+    return _repo.getTask(taskId);
+  }
+
   /// Görevi `pending`'e döndürür (manuel retry).
+  ///
+  /// Yalnızca `permanentlyFailed` veya `cancelled` görevler için geçerlidir.
   Future<void> retry(String taskId) async {
     _assertDisposed();
+    final task = await _repo.getTask(taskId);
+    if (task == null) {
+      throw StateError('retry(): görev bulunamadı: $taskId');
+    }
+    if (task.status != UploadStatus.permanentlyFailed &&
+        task.status != UploadStatus.cancelled) {
+      throw StateError(
+        'retry() yalnızca permanentlyFailed veya cancelled görevler için '
+        'çağrılabilir (şu anki durum: ${task.status}).',
+      );
+    }
     await _repo.markPending(taskId);
     _triggerWorker();
   }
@@ -354,11 +379,13 @@ class QueueController {
   /// Worker'ı geçici durdurur (in-memory, kalıcı değil).
   void pause() {
     _paused = true;
+    _notifyFlagsChanged();
   }
 
   /// Worker'ı yeniden başlatır.
   void resume() {
     _paused = false;
+    _notifyFlagsChanged();
     _triggerWorker();
   }
 
@@ -379,16 +406,41 @@ class QueueController {
   /// Kuyruğun anlık özetini yayınlayan stream.
   ///
   /// `isPaused` ve `pausedDueToAuth` değerleri her yayında güncel
-  /// in-memory durumu yansıtır.
+  /// in-memory durumu yansıtır; `pause()`/`resume()` sonrası da
+  /// mevcut abonelere yeni bir özet gönderilir.
   Stream<QueueSummary> watchSummary() {
-    // flatMap: her repo değişikliğinde güncel _paused/_pausedDueToAuth ile
-    // taze bir QueueSummary üretilir
-    return _repo
-        .watchSummary(isPaused: _paused, pausedDueToAuth: _pausedDueToAuth)
-        .map(
-          (s) =>
-              s.copyWith(isPaused: _paused, pausedDueToAuth: _pausedDueToAuth),
-        );
+    return Stream<QueueSummary>.multi((multi) {
+      QueueSummary? last;
+      final subs = <StreamSubscription<dynamic>>[
+        _repo
+            .watchSummary(
+              isPaused: _paused,
+              pausedDueToAuth: _pausedDueToAuth,
+            )
+            .listen((s) {
+              last = s.copyWith(
+                isPaused: _paused,
+                pausedDueToAuth: _pausedDueToAuth,
+              );
+              multi.add(last!);
+            }),
+        _flagsSignal.stream.listen((_) {
+          if (last != null) {
+            multi.add(
+              last!.copyWith(
+                isPaused: _paused,
+                pausedDueToAuth: _pausedDueToAuth,
+              ),
+            );
+          }
+        }),
+      ];
+      multi.onCancel = () async {
+        for (final sub in subs) {
+          await sub.cancel();
+        }
+      };
+    });
   }
 
   /// Filtrelenmiş görev listesini yayınlayan stream.
@@ -418,7 +470,21 @@ class QueueController {
   }
 
   /// Tek bir görevi ve sandbox kopyasını kalıcı olarak siler.
-  Future<void> purge(String taskId) => _repo.purge(taskId);
+  ///
+  /// Yalnızca `permanentlyFailed` veya `cancelled` görevler için geçerlidir.
+  Future<void> purge(String taskId) async {
+    _assertDisposed();
+    final task = await _repo.getTask(taskId);
+    if (task == null) return;
+    if (task.status != UploadStatus.permanentlyFailed &&
+        task.status != UploadStatus.cancelled) {
+      throw StateError(
+        'purge() yalnızca permanentlyFailed veya cancelled görevler için '
+        'çağrılabilir (şu anki durum: ${task.status}). Önce cancel() çağırın.',
+      );
+    }
+    await _repo.purge(taskId);
+  }
 
   /// Tüm `permanentlyFailed` görevleri siler.
   Future<void> purgeAllFailed() => _repo.purgeAllFailed();
@@ -448,15 +514,20 @@ class QueueController {
     if (_disposed || _paused) return;
     if (!_canProcess()) return;
 
-    final task = await _repo.getNextPending(DateTime.now());
+    // wifiOnly + cellular: yalnızca forceUploadOnce snapshot'ındaki görevler
+    // (yüksek öncelikli snapshot-dışı görevler açlık yaratmasın)
+    Set<String>? onlyIds;
+    if (_wifiOnly && _lastStatus != ConnectivityStatus.wifi) {
+      if (_forceUploadSnapshot.isEmpty) return;
+      onlyIds = Set<String>.from(_forceUploadSnapshot);
+    }
+
+    final task = await _repo.getNextPending(
+      DateTime.now(),
+      onlyTaskIds: onlyIds,
+    );
     if (task == null) return;
 
-    // wifiOnly: force snapshot dışındaki görevler wifi gerektiriyor
-    if (_wifiOnly &&
-        _lastStatus != ConnectivityStatus.wifi &&
-        !_forceUploadSnapshot.contains(task.taskId)) {
-      return;
-    }
     _forceUploadSnapshot.remove(task.taskId);
 
     await _uploadTask(task);
@@ -565,10 +636,8 @@ class QueueController {
       cancelToken.cancel();
     }
 
-    // Progress aktarımı
-    final progressController = _progressControllers[task.taskId];
-    final hasProgressListener =
-        progressController != null && progressController.hasListener;
+    // Progress: gerçek dinleyici kontrolü repo'daki stream controller'da
+    final hasProgressListener = _repo.hasProgressListener(task.taskId);
 
     UploadResult result;
     try {
@@ -587,20 +656,22 @@ class QueueController {
         cancelToken: cancelToken,
       );
     } catch (e) {
-      // İptal — sessizce pending'e bırak (cancel() zaten markCancelled yaptı)
-      if (cancelToken.isCancelled) {
-        _activeTokens.remove(task.taskId);
-        if (_disposed) {
-          try {
-            await _repo.markPending(task.taskId);
-          } catch (_) {}
-        }
-        return;
-      }
       result = UploadResult.failure(FailureType.network);
     }
 
     _activeTokens.remove(task.taskId);
+
+    // cancel()/dispose() sonrası adapter failure veya exception dönebilir —
+    // DB durumunu failed ile ezme.
+    if (cancelToken.isCancelled) {
+      if (_disposed) {
+        try {
+          await _repo.markPending(task.taskId);
+        } catch (_) {}
+      }
+      // cancel() zaten markCancelled yaptı; dispose yolu pending yazar.
+      return;
+    }
 
     if (result.success) {
       await _handleSuccess(task, checksum, result.remoteChecksum);
@@ -667,9 +738,12 @@ class QueueController {
     }
 
     // authExpired → onAuthExpired callback
+    // Not: tek worker bu await sırasında bloklanır; diğer görevler
+    // callback bitene kadar işlenmez (bkz. QueueSummary.pausedDueToAuth).
     final authCallback = _onAuthExpired;
     if (failureType == FailureType.authExpired && authCallback != null) {
       _pausedDueToAuth = true;
+      _notifyFlagsChanged();
       try {
         var effectiveTimeout = _authTimeout;
         if (_backgroundDeadline != null) {
@@ -680,6 +754,7 @@ class QueueController {
         }
         await authCallback().timeout(effectiveTimeout);
         _pausedDueToAuth = false;
+        _notifyFlagsChanged();
         // Auth yenilendi — görevi failed(0 delay) ile tekrar dene
         // markFailed retryCount'u artırır, böylece sonsuz 401 döngüsü engellenir
         await _repo.markFailed(
@@ -693,6 +768,7 @@ class QueueController {
         return;
       } catch (e) {
         _pausedDueToAuth = false;
+        _notifyFlagsChanged();
         _log(
           'Auth callback başarısız veya timeout: $e',
           level: LogLevel.warning,
@@ -756,12 +832,33 @@ class QueueController {
 
   // ── Dispose ───────────────────────────────────────────────────────────────
 
+  /// Aktif upload'ları iptal eder ve görevleri `pending`'e döndürür.
+  ///
+  /// Kuyruk yaşam döngüsünü bozmaz — iOS `expirationHandler` için uygundur.
+  Future<void> abortActiveUploads() async {
+    if (_disposed) return;
+    final activeEntries = _activeTokens.entries.toList();
+    for (final entry in activeEntries) {
+      entry.value.cancel();
+      try {
+        await _repo.markPending(entry.key);
+      } catch (_) {}
+    }
+    _activeTokens.clear();
+  }
+
   /// Kaynakları serbest bırakır.
   ///
   /// Aktif upload varsa token'ı iptal eder, görevi `pending`'e döndürür
   /// (`cancelled`'a değil — bkz. §8 "dispose() sırasında aktif worker").
   Future<void> dispose() async {
     if (_disposed) return;
+
+    // Aktif upload'ları iptal et (henüz _disposed=false iken)
+    // bkz. §8 — dispose() görevi cancelled'a almaz, sonraki init()'te
+    // backoff beklemeden tekrar alınabilir olsun diye pending'e döner.
+    await abortActiveUploads();
+
     _disposed = true;
 
     // Heartbeat durdur
@@ -773,25 +870,14 @@ class QueueController {
       await _connectivityMonitor.dispose();
     }
 
-    // Aktif upload'ları iptal et ve pending'e döndür (cancelled değil!)
-    // bkz. §8 — dispose() görevi cancelled'a almaz, sonraki init()'te
-    // backoff beklemeden tekrar alınabilir olsun diye pending'e döner.
-    final activeEntries = _activeTokens.entries.toList();
-    for (final entry in activeEntries) {
-      entry.value.cancel();
-      try {
-        await _repo.markPending(entry.key);
-      } catch (_) {}
-    }
-    _activeTokens.clear();
-
     for (final timer in _backoffTimers.values) {
       timer.cancel();
     }
     _backoffTimers.clear();
 
-    // Worker trigger stream'ini kapat
+    // Worker trigger / flags stream'lerini kapat
     await _triggerController.close();
+    await _flagsSignal.close();
 
     // Kilidin sahibi bu worker ise serbest bırak
     // (stale bekleme sırasında _lockAcquired false olabilir)
@@ -804,6 +890,10 @@ class QueueController {
 
     // Repo'yu kapat
     await _repo.dispose();
+  }
+
+  void _notifyFlagsChanged() {
+    if (!_flagsSignal.isClosed) _flagsSignal.add(null);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

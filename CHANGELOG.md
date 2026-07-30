@@ -2,6 +2,18 @@
 
 ### Breaking Changes
 - **API Değişikliği:** `PersistenceRepository.enqueue` imzasından `sequenceNumber` parametresi kaldırıldı. Sequence numarası artık repository tarafından (transaction içerisinde güvenli şekilde) otomatik üretiliyor. Özel `PersistenceRepository` implementasyonlarının `enqueue` imzalarını güncellemeleri gerekir.
+- **`PersistenceRepository.init()`** artık crash recovery yapmaz; `recoverStuckUploads()` worker kilidi alındıktan sonra çağrılmalıdır (çift yükleme yarışını önlemek için). `QueueController` bunu otomatik yönetir.
+- **`retry()` / `purge()`** yalnızca `permanentlyFailed` / `cancelled` görevleri kabul eder; aksi halde `StateError`.
+- Özel `PersistenceRepository` implementasyonları için yeni üyeler: `getTask`, `hasProgressListener`, `getNextPending(..., onlyTaskIds:)`.
+
+### Bug Fixes
+- `dispose()` sonrası `init()` artık çalışır (`late final` kaldırıldı).
+- `BackgroundTaskRunner` paylaşılan (iOS) kuyruğu dispose etmez; `abortActiveUploads()` eklendi.
+- `watchProgress` dinleyici varken gerçekten `onProgress` bağlanır.
+- `cancel()` / `dispose()` sonrası adapter `failure` dönüşü görevi `failed` ile ezmez.
+- `updateHeartbeat` yalnızca kilit sahibi için yazar.
+- `forceUploadOnce` öncelik açlığı giderildi; `pause()`/`resume()` `watchSummary` abonelerini günceller.
+- Sequence üretimi O(1) meta sayaç kullanır; yayın arşivinden `build/` ve geçici kök dosyalar çıkarıldı.
 
 ## 0.5.1
 

@@ -6,36 +6,45 @@ import '../queue/upload_queue.dart';
 ///
 /// İşletim sistemleri (iOS/Android) arka plan görevlerine katı zaman sınırları
 /// koyar (örn. iOS'ta ~30 saniye). Bu sınıf:
-/// 1. Verilen kuyruğu (`UploadQueue`) başlatır.
+/// 1. Verilen kuyruğu (`UploadQueue`) gerekirse başlatır.
 /// 2. İçsel bir zaman aşımı (20 saniye) belirler.
 /// 3. Kuyruğun bekleyen (pending) işlerini işlemeye başlamasını sağlar.
-/// 4. Kuyruk boşaldığında veya 20 sn dolduğunda temiz bir kapanış (`dispose`)
-///    yapar ve sonucu işletim sistemine bildirir.
+/// 4. Kuyruk boşaldığında veya 20 sn dolduğunda temiz bir kapanış yapar.
+///
+/// ## Yaşam döngüsü
+///
+/// - Kuyruk henüz `init()` edilmemişse (Android Workmanager isolate'i gibi)
+///   bu sınıf onu başlatır ve bitince `dispose()` eder.
+/// - Kuyruk zaten açıksa (iOS'ta paylaşılan foreground kuyruğu) yalnızca
+///   deadline uygular; iş bitiminde **dispose etmez**.
 ///
 /// ## iOS Entegrasyonu
-/// `onAppRefresh` ve `onProcessing` çağrılarında bu sınıf kullanılır.
-/// (Bkz. plan §13)
+/// `onAppRefresh` / `onProcessing` içinde kullanın; `onExpiration` için
+/// `queue.abortActiveUploads()` tercih edin (`dispose` değil).
 ///
 /// ## Android Entegrasyonu
-/// `workmanager`'ın `callbackDispatcher` metodunda bu sınıf kullanılır.
-/// (Bkz. plan §13)
+/// `workmanager` `callbackDispatcher` içinde kullanın.
 class BackgroundTaskRunner {
   /// [queue] çalıştırılacak UploadQueue örneği.
-  /// [timeout] görevin maksimum çalışma süresi (varsayılan 20 saniye). İşletim
-  ///   sistemi görevi sonlandırmadan önce bizim kendi içimizde temiz kapanış
-  ///   yapabilmemiz için bu süre OS sınırından (30sn) kısa olmalıdır.
+  /// [timeout] görevin maksimum çalışma süresi (varsayılan 20 saniye).
   static Future<bool> run(
     UploadQueue queue, {
     Duration timeout = const Duration(seconds: 20),
   }) async {
     final deadline = DateTime.now().add(timeout);
     bool hasPending = false;
+    final ownedLifecycle = !queue.isInitialized;
 
-    // Kuyruğa arka plan deadline'ını bildir (authTimeout bütçesi için)
+    // Deadline'ı init öncesi sakla (UploadQueue buffer'lar) — init sonrası da set.
     queue.setBackgroundDeadline(deadline);
 
     try {
-      await queue.init();
+      if (ownedLifecycle) {
+        await queue.init();
+      } else {
+        // Zaten init'li kuyrukta da deadline'ı taze uygula.
+        queue.setBackgroundDeadline(deadline);
+      }
 
       // ── Deadline-aware bekleme ────────────────────────────────────────────
       // Problem: watchSummary() sonsuz bir reactive stream'dir. Eğer kuyrukta
@@ -44,8 +53,7 @@ class BackgroundTaskRunner {
       //
       // Çözüm: `Future.any` ile iki yarış koşulunu paralel bekle:
       //   (a) stream'den kuyruk-boş sinyali
-      //   (b) bağımsız `Future.delayed` ile 20 sn hard deadline
-      // Hangisi önce tamamlanırsa döngü sonlanır.
+      //   (b) bağımsız `Future.delayed` ile hard deadline
       final emptyCompleter = Completer<void>();
 
       final sub = queue.watchSummary().listen((summary) {
@@ -58,16 +66,17 @@ class BackgroundTaskRunner {
       await Future.any([emptyCompleter.future, Future<void>.delayed(timeout)]);
 
       await sub.cancel();
-    } catch (e) {
-      // Beklenmeyen hata — dispose() finally'de çalışır
+    } catch (_) {
+      // Beklenmeyen hata — finally temizler
     } finally {
-      // Temiz kapanış — aktif yükleme varsa iptal eder ve durumu pending'e döndürür.
-      await queue.dispose();
       queue.setBackgroundDeadline(null);
+      // Yalnızca bu çağrıda açtığımız kuyruğu kapat (paylaşılan iOS kuyruğunu değil).
+      if (ownedLifecycle) {
+        await queue.dispose();
+      }
     }
 
-    // iOS/Android zincirleme mantığı: Eğer hala bekleyen iş varsa OS'a
-    // zincirleme yeniden kayıt yapmasını söyle (true dönerek).
+    // iOS/Android zincirleme mantığı: hâlâ bekleyen iş varsa yeniden kayıt.
     return hasPending;
   }
 }

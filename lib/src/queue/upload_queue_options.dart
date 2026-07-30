@@ -60,15 +60,15 @@ class UploadQueueAdvancedOptions {
   /// veya otomatik silmez (bkz. Bölüm 4, \"tam backpressure değil\").
   final int? diskUsageWarningBytes;
 
-  /// Dosya kopyalama işlemi için fallback eşiği.
-  /// `copyToSandbox` etkin olduğunda, bu boyuttan daha büyük dosyalar
-  /// belleği tüketmemek için streaming ile kopyalanır ve öncelikle
-  /// hardlink (ln) kullanılmaya çalışılır.
-  /// `null` ise varsayılan olarak her dosya boyutu için streaming+hardlink denenir
-  /// (yeni önerilen davranış budur, ancak null değeri tüm dosyalar için bunu
-  /// aktifleştireceği için bir boyut tanımlamak performanslı olabilir).
+  /// Hardlink başarısız olduktan sonra byte-kopyalama stratejisi eşiği.
   ///
-  /// Örnek: `50 * 1024 * 1024` (50MB).
+  /// `copyToSandbox` etkinken sıra her zaman: (1) hardlink (`ln`,
+  /// Windows hariç), (2) başarısızsa kopya. Bu eşik yalnızca adım (2)
+  /// içindir: dosya boyutu eşikten **büyükse** streaming copy, aksi
+  /// halde `File.copy` kullanılır.
+  ///
+  /// `null` (varsayılan) → hardlink sonrası her boyutta `File.copy`
+  /// (streaming yok). Büyük dosyalar için örn. `50 * 1024 * 1024`.
   final int? sandboxCopyThresholdBytes;
 
   /// Disk kullanımı [diskUsageWarningBytes] eşiğini her aşışında çağrılır.

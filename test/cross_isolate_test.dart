@@ -173,7 +173,8 @@ void main() {
 
       // İkinci repo (Uygulamanın yeniden başlaması simülasyonu)
       final repo2 = SembastPersistenceRepository(boxName: boxName);
-      await repo2.init(); // recoverStuckUploads çalışır
+      await repo2.init();
+      await repo2.recoverStuckUploads();
 
       final recovered = await repo2.getNextPending(DateTime.now());
       expect(
