@@ -4,17 +4,10 @@ import 'package:offline_upload_queue/offline_upload_queue.dart';
 
 import '../main.dart';
 
-/// Sekme 2: wifiOnly + forceUploadOnce().
-///
-/// Gösterilen API'ler:
-///   - `wifiOnly: true` etkin ayrı kuyruk örneği
-///   - `forceUploadOnce()` — cellular'da "Şimdi Yükle" butonu (plan §1, test #15)
-///   - `pause()` / `resume()`
-///   - `watchSummary()` üzerinden `isPaused` bayrağı
+/// Tab 2: wifiOnly + forceUploadOnce(), pause / resume.
 
-/// wifiOnly: true modunda çalışan ayrı kuyruk örneği.
 final wifiOnlyQueue = UploadQueue(
-  adapter: uploadQueue.adapter, // MockUploadAdapter'ı paylaş
+  adapter: uploadQueue.adapter,
   wifiOnly: true,
   boxName: 'wifi_only_demo',
   maxAttempts: 3,
@@ -61,19 +54,18 @@ class _CellularScreenState extends State<CellularScreen> {
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kuyruğa eklendi (Wi-Fi bekleniyor)')),
+        const SnackBar(content: Text('Enqueued (waiting for Wi‑Fi)')),
       );
     }
   }
 
   Future<void> _forceUpload() async {
     await _ensureWifiQueueReady();
-    // forceUploadOnce() → wifiOnly: true olsa bile mevcut bağlantıda işler
     await wifiOnlyQueue.forceUploadOnce();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('forceUploadOnce() çağrıldı — cellular\'da çalışır'),
+          content: Text('forceUploadOnce() — runs once on cellular'),
         ),
       );
     }
@@ -101,7 +93,6 @@ class _CellularScreenState extends State<CellularScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Açıklama kartı
             Card(
               color: theme.colorScheme.surfaceContainerHighest,
               child: const Padding(
@@ -118,10 +109,9 @@ class _CellularScreenState extends State<CellularScreen> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Bu sekmedeki kuyruk yalnızca Wi-Fi bağlantısında '
-                      'otomatik yükleme yapar.\n\n'
-                      '"Şimdi Yükle" butonu forceUploadOnce() çağırır — '
-                      'cellular\'da da çalışır (tek seferlik bypass).',
+                      'This queue only auto-uploads on Wi‑Fi.\n\n'
+                      '"Upload now" calls forceUploadOnce() — a one-shot '
+                      'bypass that also works on cellular.',
                     ),
                   ],
                 ),
@@ -129,7 +119,6 @@ class _CellularScreenState extends State<CellularScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Canlı özet (Sadece kuyruk hazırsa göster)
             _isReady
                 ? StreamBuilder<QueueSummary>(
                     stream: wifiOnlyQueue.watchSummary(),
@@ -152,11 +141,11 @@ class _CellularScreenState extends State<CellularScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _Info('Bekliyor', s.pending.toString()),
-                            _Info('Tamamlandı', s.completed.toString()),
+                            _Info('Pending', s.pending.toString()),
+                            _Info('Completed', s.completed.toString()),
                             _Info(
-                              'Duraklatıldı',
-                              s.isPaused ? 'Evet' : 'Hayır',
+                              'Paused',
+                              s.isPaused ? 'Yes' : 'No',
                             ),
                           ],
                         ),
@@ -166,11 +155,10 @@ class _CellularScreenState extends State<CellularScreen> {
                 : const Center(child: CircularProgressIndicator()),
             const SizedBox(height: 24),
 
-            // Butonlar
             FilledButton.icon(
               onPressed: _pickAndEnqueue,
               icon: const Icon(Icons.photo_library_outlined),
-              label: const Text('Galeriden Ekle (Wi-Fi bekliyor)'),
+              label: const Text('Add from gallery (waits for Wi‑Fi)'),
             ),
             const SizedBox(height: 12),
             FilledButton.tonal(
@@ -184,7 +172,7 @@ class _CellularScreenState extends State<CellularScreen> {
                 children: [
                   Icon(Icons.bolt),
                   SizedBox(width: 8),
-                  Text('Şimdi Yükle — forceUploadOnce()'),
+                  Text('Upload now — forceUploadOnce()'),
                 ],
               ),
             ),
@@ -192,7 +180,7 @@ class _CellularScreenState extends State<CellularScreen> {
             OutlinedButton.icon(
               onPressed: _togglePause,
               icon: Icon(_paused ? Icons.play_arrow : Icons.pause),
-              label: Text(_paused ? 'Devam Et (resume)' : 'Duraklat (pause)'),
+              label: Text(_paused ? 'Resume' : 'Pause'),
             ),
           ],
         ),

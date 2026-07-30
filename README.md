@@ -1,66 +1,99 @@
 # Offline Upload Queue
 
-**An enterprise-grade, offline-first image and file upload queue for Flutter.** 
-Built for durability, this package ensures your uploads survive app terminations, network outages, and background restrictions.
+Offline-first file upload queue for Flutter. Uploads survive app kills, flaky networks, and opportunistic OS background wakes.
 
 [![pub.dev](https://img.shields.io/pub/v/offline_upload_queue.svg?style=flat-square)](https://pub.dev/packages/offline_upload_queue)
 [![pub points](https://img.shields.io/pub/points/offline_upload_queue?style=flat-square)](https://pub.dev/packages/offline_upload_queue/score)
 [![CI](https://github.com/cengizhankkaya/offline_upload_queue/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/cengizhankkaya/offline_upload_queue/actions)
-[![Coverage](https://github.com/cengizhankkaya/offline_upload_queue/actions/workflows/coverage.yml/badge.svg?style=flat-square)](https://github.com/cengizhankkaya/offline_upload_queue/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-blue.svg?style=flat-square)](https://pub.dev/packages/offline_upload_queue)
 
-Whether your users are deep in the subway, switching between Wi-Fi and Cellular, or force-closing your app during an upload, `offline_upload_queue` guarantees their data is safely queued and automatically uploaded the moment conditions allow. 
+**Requires Flutter ≥ 3.24 · Dart ≥ 3.12 · iOS & Android only**
 
-Powered by **Sembast** (for pure-Dart durability), **Dio** (for robust networking), and **Workmanager / BGTaskScheduler** (for OS-level background sync).
-
----
-
-## 🌟 Why `offline_upload_queue`?
-
-* **True Offline-First:** Enqueue files instantly without waiting for a network connection.
-* **Crash & Reboot Resilient:** Tasks are persisted to a local Sembast database. If the app is killed mid-upload, it resumes on the next launch.
-* **OS-Level Background Sync:** Native integrations wake up your app in the background to drain the queue silently.
-* **Pluggable Architecture:** Bring your own `UploadAdapter` (REST, GraphQL, AWS S3, Firebase).
-* **Reactive UI:** Full stream-based API for rendering live progress bars and queue summaries.
-
-## 🧪 Proven Reliability (Battle-Tested)
-
-This package has undergone rigorous automated integration testing on real devices:
-- **Chaos Network Tested:** Gracefully handles `429 Too Many Requests` and connection timeouts with exponential backoff.
-- **Crash Recovery & Lock Stealing:** Recovers automatically if the app is force-killed (`kill -9`) mid-upload, intelligently stealing stale locks.
-- **Load Tested:** Proven to handle rapid enqueueing of 1000+ files and streaming of 20MB+ files without UI jank or memory leaks.
-- **Security Verified:** Sembast database encryption (Salsa20+SHA256) is thoroughly verified against plaintext data extraction.
+Persistence via [Sembast](https://pub.dev/packages/sembast), networking via [Dio](https://pub.dev/packages/dio), background via Workmanager (Android) and BGTaskScheduler (iOS).
 
 ---
 
-## 📦 Features
+## Contents
 
-- 💾 **Persistent Queue** — Data survives process kills and device reboots.
-- 🔁 **Smart Retries** — Configurable exponential backoff with jitter.
-- 📶 **Network Constraints** — Wi-Fi only mode with `forceUploadOnce()` cellular override.
-- 🔄 **Reactive Streams** — Listen to `watchSummary()`, `watchTasks()`, and `watchProgress()`.
-- 🛡️ **Data Integrity** — End-to-end SHA-256 checksum verification.
-- 🔐 **Token Refresh** — Built-in `onAuthExpired` hook for seamless 401/403 recovery.
-- 📊 **Storage Management** — Disk usage tracking and warning thresholds.
-- 🗂️ **Multi-Queue Support** — Isolated databases via `boxName`.
+- [Why this package](#why-this-package)
+- [Demo](#demo)
+- [Features](#features)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Custom upload adapter](#custom-upload-adapter)
+- [Wi‑Fi only & force upload](#wi-fi-only--force-upload)
+- [Auth token refresh](#auth-token-refresh)
+- [Task state machine](#task-state-machine)
+- [Sandbox & disk usage](#sandbox--disk-usage)
+- [Background sync](#background-sync)
+- [API highlights](#api-highlights)
+- [Caveats](#caveats)
+- [Security](#security)
+- [When not to use](#when-not-to-use)
+- [Links](#links)
 
 ---
 
-## ⚙️ Installation
+## Why this package
+
+- **Offline-first enqueue** — accept files immediately; upload when the network allows.
+- **Crash resilient** — tasks live in a local Sembast DB; stuck `uploading` rows recover after lock acquisition.
+- **OS background drain** — best-effort wakeups via BGTaskScheduler / Workmanager (not a foreground service).
+- **Pluggable transport** — bring REST, S3, Firebase, GraphQL, or any custom `UploadAdapter`.
+- **Reactive UI** — `watchSummary()`, `watchTasks()`, `watchProgress()`.
+
+Integration coverage includes chaos network scenarios (429 / timeouts), stale-lock handoff, large-file sandbox copy, and encryption smoke tests. See [`example/integration_test/`](example/integration_test/).
+
+---
+
+## Demo
+
+From the [`example/`](example/) app on Android — enqueue photos and watch the reactive summary + per-task progress update live:
+
+<p align="center">
+  <img src="doc/screenshots/enqueue_and_progress.gif" alt="Enqueue photos and watch live progress" width="280"/>
+</p>
+
+| Live queue | After enqueue | Wi‑Fi only / force upload |
+|:---:|:---:|:---:|
+| <img src="doc/screenshots/queue_active.jpeg" alt="Queue with pending, uploading, completed" width="200"/> | <img src="doc/screenshots/queue_enqueued.jpeg" alt="SnackBar after batch enqueue" width="200"/> | <img src="doc/screenshots/cellular_force_upload.jpeg" alt="Cellular forceUploadOnce screen" width="200"/> |
+
+---
+
+## Features
+
+- Persistent queue across process death and reboot
+- Exponential backoff with jitter; permanent vs transient failure types
+- `wifiOnly` + one-shot cellular bypass (`forceUploadOnce`)
+- SHA-256 checksum (optional pin-at-enqueue)
+- `onAuthExpired` hook for 401/403 recovery
+- Disk usage estimate + warning callback
+- Multiple isolated queues via `boxName`
+- Optional DB encryption (`encryptionKey`) and per-field `MetadataCodec`
+
+---
+
+## Installation
 
 ```bash
 flutter pub add offline_upload_queue
 ```
 
+```yaml
+dependencies:
+  offline_upload_queue: ^0.6.0
+```
+
+Minimum: **Flutter 3.24+**, **Dart 3.12+**. Platforms: **iOS** and **Android** only.
+
 ---
 
-## 🚀 Quick Start
+## Quick start
 
 ```dart
 import 'package:offline_upload_queue/offline_upload_queue.dart';
 
-// 1. Initialize the queue
 final queue = UploadQueue(
   adapter: RestUploadAdapter(
     baseUrl: 'https://api.example.com',
@@ -69,59 +102,168 @@ final queue = UploadQueue(
 );
 await queue.init();
 
-// 2. Enqueue a file
 final taskId = await queue.enqueue(
   filePath: photo.path,
   metadata: {'albumId': '42', 'userId': 'u1'},
 );
 
-// 3. Listen to live queue summary
-queue.watchSummary().listen((summary) {
-  print('${summary.pending} pending, ${summary.completed} completed');
+queue.watchSummary().listen((s) {
+  debugPrint('${s.pending} pending · ${s.completed} completed');
 });
 
-// 4. Clean up when done (e.g., on app termination)
+// App shutdown / isolate teardown:
 await queue.dispose();
+```
+
+Full demo: [`example/`](example/).
+
+---
+
+## Custom upload adapter
+
+`RestUploadAdapter` posts multipart to `$baseUrl/upload`. For S3, Firebase, GraphQL, or a custom protocol, implement `UploadAdapter`:
+
+```dart
+class S3UploadAdapter implements UploadAdapter {
+  S3UploadAdapter(this._client);
+  final YourS3Client _client;
+
+  @override
+  Future<UploadResult> uploadFile({
+    required String taskId,
+    required String filePath,
+    required Map<String, dynamic> metadata,
+    required String checksum,
+    void Function(int sent, int total)? onProgress,
+    UploadCancelToken? cancelToken,
+  }) async {
+    try {
+      cancelToken?.registerOnCancel(() => _client.abort());
+      final remote = await _client.putObject(
+        filePath: filePath,
+        key: taskId,
+        onProgress: onProgress,
+      );
+      return UploadResult.success(remoteChecksum: remote.etag);
+    } on AuthException {
+      return const UploadResult.failure(FailureType.authExpired);
+    } on RateLimitException catch (e) {
+      return UploadResult.failure(
+        FailureType.rateLimited,
+        retryAfter: e.retryAfter,
+      );
+    } catch (_) {
+      // Prefer returning failure over throwing — cancel paths also return failure.
+      if (cancelToken?.isCancelled ?? false) {
+        return const UploadResult.failure(FailureType.unknown);
+      }
+      return const UploadResult.failure(FailureType.network);
+    }
+  }
+}
+
+final queue = UploadQueue(adapter: S3UploadAdapter(s3));
 ```
 
 ---
 
-## 🏗️ Architecture & Core Concepts
+## Wi‑Fi only & force upload
 
-### Task State Machine
+```dart
+final queue = UploadQueue(
+  adapter: adapter,
+  wifiOnly: true,
+);
+await queue.init();
 
-Tasks flow sequentially through a strictly defined state machine. **Only one file is uploaded at a time** to prevent bandwidth saturation.
+// Later, on cellular, process the *current* pending snapshot once:
+await queue.forceUploadOnce();
+// Tasks enqueued after this call still wait for Wi‑Fi.
+```
 
-| State | Description |
-|---|---|
-| 🟡 `pending` | In the queue, waiting to be processed by the worker. |
-| 🔵 `uploading` | Worker is actively uploading the file. |
-| 🟢 `completed` | Successfully uploaded; sandbox copy is cleaned up. |
-| 🟠 `failed` | Temporary error (e.g., Network loss). Will automatically retry. |
-| 🔴 `permanentlyFailed`| Fatal error (e.g., 400 Bad Request, max attempts reached). Auto-retry is disabled. |
-| ⚪ `cancelled` | Manually cancelled via `cancel(taskId)`. Auto-retry is disabled. |
-
-*(Note: `permanentlyFailed` and `cancelled` tasks can be manually re-enqueued via `queue.retry(taskId)`).*
-
-### ⚠️ Storage Cost & Sandboxing
-
-By default, the queue operates with `copyToSandbox: true`. Each enqueued file is placed under an internal, private sandbox directory so uploads survive deletion of the original.
-
-* **Advantage:** If the user deletes the original photo from their gallery before the upload finishes, the upload still succeeds.
-* **How copy works:** On non-Windows platforms the queue first tries a hardlink (`ln`) on the same volume (no extra disk blocks). If that fails (cross-volume, unsupported FS, Windows), it falls back to a real byte copy — disk usage is then roughly **doubled** for pending tasks until the original is removed.
-* **Metrics:** `estimatedDiskUsageBytes` sums logical sandbox file sizes (conservative when hardlinks succeed).
-
-> **Pro-Tip:** Monitor disk usage by providing an `UploadQueueAdvancedOptions(diskUsageWarningBytes: ...)` to warn users if the offline queue is taking up too much space.
+`pause()` takes precedence over `forceUploadOnce()`.
 
 ---
 
-## 🌐 Background Sync Setup
+## Auth token refresh
 
-For uploads to continue when your app is completely terminated, you must configure platform-specific background handlers.
+```dart
+final queue = UploadQueue(
+  adapter: RestUploadAdapter(
+    baseUrl: apiBase,
+    authHeaderProvider: () async => 'Bearer ${await tokens.read()}',
+  ),
+  onAuthExpired: () async {
+    await tokens.refresh(); // must complete before the next attempt
+  },
+  authTimeout: const Duration(seconds: 30),
+);
+```
 
-### 🍏 iOS (`BGTaskScheduler`)
+While `onAuthExpired` runs, the single worker is blocked (`pausedDueToAuth: true` on `QueueSummary`). Fail or timeout → normal backoff.
 
-**1. Update `Info.plist`**
+---
+
+## Task state machine
+
+Only **one** file uploads at a time (serial worker).
+
+<p align="center">
+  <img src="doc/screenshots/state_machine.jpg" alt="Task state machine" width="420"/>
+</p>
+
+| State | Meaning |
+|---|---|
+| `pending` | Waiting for the worker |
+| `uploading` | Active HTTP/upload work |
+| `completed` | Success; sandbox copy deleted |
+| `failed` | Transient error — will retry with backoff |
+| `permanentlyFailed` | Fatal / max attempts — no auto-retry |
+| `cancelled` | User cancelled — no auto-retry |
+
+Re-queue terminal tasks with `queue.retry(taskId)` (`permanentlyFailed` or `cancelled` only).
+
+---
+
+## Sandbox & disk usage
+
+Default: `copyToSandbox: true`.
+
+1. Try a **hardlink** (`ln`) on the same volume (no extra disk blocks; non-Windows).
+2. On failure → byte copy (`File.copy` or streaming above `sandboxCopyThresholdBytes`).
+
+`estimatedDiskUsageBytes` sums logical sizes (conservative when hardlinks succeed).
+
+```dart
+UploadQueue(
+  adapter: adapter,
+  advanced: UploadQueueAdvancedOptions(
+    diskUsageWarningBytes: 100 * 1024 * 1024,
+    onDiskUsageWarning: (current, limit) {
+      // Prompt the user to purge completed / cancelled tasks
+    },
+  ),
+);
+```
+
+---
+
+## Background sync
+
+Background work is **best-effort**. iOS schedules opportunistically; Android is subject to Doze. This package does **not** run a foreground service.
+
+### Shared vs owned queue
+
+| Context | Pattern |
+|---|---|
+| Android Workmanager isolate | Create a **new** `UploadQueue` → `BackgroundTaskRunner.run` disposes it |
+| iOS BGTask on the app engine | Pass the **same** foreground queue → runner does **not** dispose it |
+| iOS expiration | Call `queue.abortActiveUploads()` — **never** `dispose()` the shared queue |
+
+### iOS (`BGTaskScheduler`)
+
+**1. `Info.plist`**
+
 ```xml
 <key>BGTaskSchedulerPermittedIdentifiers</key>
 <array>
@@ -130,43 +272,35 @@ For uploads to continue when your app is completely terminated, you must configu
 </array>
 ```
 
-**2. Enable Background Modes**
-In Xcode, go to **Signing & Capabilities -> Background Modes** and check **Background fetch** and **Background processing**. *(If missed, tasks will silently fail).*
+**2. Xcode → Signing & Capabilities → Background Modes**
 
-**3. Register in `AppDelegate.swift`**
-```swift
-import BackgroundTasks
+- Background fetch
+- Background processing
 
-// Inside application(_:didFinishLaunchingWithOptions:):
-BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.example.app.upload_refresh", using: nil) { task in
-  self.handleAppRefresh(task: task as! BGAppRefreshTask)
-}
-BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.example.app.upload_processing", using: nil) { task in
-  self.handleProcessing(task: task as! BGProcessingTask)
-}
-```
+**3. Register in `AppDelegate.swift`** (see [`example/ios/Runner/AppDelegate.swift`](example/ios/Runner/AppDelegate.swift))
 
-**4. Hook up in Dart**
+**4. Dart**
+
 ```dart
 IosBackgroundChannel.instance.setMethodCallHandler(
   onAppRefresh: () => BackgroundTaskRunner.run(queue),
   onProcessing: () => BackgroundTaskRunner.run(queue),
-  // Paylaşılan foreground kuyruğunu dispose etmeyin:
-  onExpiration: () { queue.abortActiveUploads(); },
+  onExpiration: () {
+    queue.abortActiveUploads(); // keep the foreground queue alive
+  },
 );
 ```
 
-### 🤖 Android (`Workmanager`)
+### Android (`Workmanager`)
 
-**1. Update `AndroidManifest.xml`**
+**1. `AndroidManifest.xml`**
+
 ```xml
-<!-- Workmanager boot sonrası zinciri yeniden kurabilsin -->
 <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-<!-- Not: Bu paket foreground service kullanmaz; FGS izni gerekmez. -->
+<!-- No FOREGROUND_SERVICE permission required -->
 ```
 
-**2. Configure the Dispatcher in Dart**
-Ensure this is defined as a top-level function.
+**2. Top-level dispatcher**
 
 ```dart
 @pragma('vm:entry-point')
@@ -190,52 +324,64 @@ void main() async {
 }
 ```
 
-> **Important:** Background execution is **best-effort**. iOS uses opportunistic scheduling, and Android is subject to Doze mode. Guaranteed instant execution is not possible on modern mobile OS.
+After enqueueing work in the foreground, call `AndroidBackgroundRunner.scheduleNextRun()` when you want a background drain chain.
 
 ---
 
-## 📖 API Reference Highlights
+## API highlights
 
-### Queue Controls
-* `queue.init()` — Initializes the Sembast database and starts the worker loop.
-* `queue.pause()` / `queue.resume()` — Temporarily suspends the worker (resets on app restart).
-* `queue.forceUploadOnce()` — Bypasses `wifiOnly` rules to process the current snapshot of pending tasks over cellular.
-* `queue.dispose()` — Safely cancels active requests and gracefully shuts down the worker.
+| API | Role |
+|---|---|
+| `init` / `dispose` | Open DB + worker; safe to `init` again after `dispose` |
+| `enqueue` / `enqueueBatch` | Add files (+ JSON metadata) |
+| `pause` / `resume` | In-memory worker gate |
+| `forceUploadOnce` | Cellular bypass snapshot |
+| `cancel` / `retry` / `getTask` | Per-task control |
+| `purge` / `purgeAll*` | Delete terminal (or completed) rows + sandbox files |
+| `abortActiveUploads` | Cancel in-flight work → `pending` without disposing |
+| `watchSummary` / `watchTasks` / `watchProgress` | Reactive UI |
 
-### Task Management
-* `queue.cancel(taskId)` — Stops an active upload immediately.
-* `queue.retry(taskId)` — Resets backoff state and re-enqueues a failed/cancelled task.
-* `queue.purgeAllCompleted()` — Cleans up database records for finished uploads (sandbox files are deleted automatically).
+Use **list index** for UI order — `sequenceNumber` may have gaps.
 
-### Streams
-* `watchSummary()` — Emits total counts for all states (e.g. `pending`, `uploading`, `failed`).
-* `watchTasks({statuses})` — Emits the actual list of tasks. **Always use the list index for UI counters**, as `sequenceNumber` can have gaps.
-* `watchProgress(taskId)` — Emits a `double` from `0.0` to `1.0`.
-
----
-
-## ⚠️ Important Caveats & Best Practices
-
-1. **`copyToSandbox: false` Risks:** If you disable sandboxing, you are responsible for keeping the source file alive. Providing an Android `content://` URI or an iOS `PHAsset` directly will fail. You must resolve them to absolute physical file paths.
-2. **Checksum Timing:** Checksums are computed right before the upload begins, **not** when enqueued. If a file is altered between enqueueing and uploading, it will be uploaded with the new content seamlessly.
-3. **Stale Lock Calibration:** The worker uses a mutex lock to prevent concurrent uploads of the same file. The `staleLockThreshold` defaults to 5 minutes. If your uploads typically take 10 minutes, you **must** increase this threshold in `UploadQueueAdvancedOptions`, otherwise another worker might steal the lock mid-upload.
+API docs: [pub.dev documentation](https://pub.dev/documentation/offline_upload_queue/latest/).
 
 ---
 
-## 🔒 Security & Privacy
+## Caveats
 
-* **Encryption:** If you provide an `encryptionKey`, the local Sembast database encrypts metadata using a Salsa20+SHA256 codec. **Note:** This codec has not undergone independent security audits. For strict GDPR/KVKK/HIPAA compliance, do not store PII in the metadata, or use OS-level encryption (iOS Data Protection / Android FBE).
-* **Connectivity Check:** By default, the package checks network reachability by pinging `https://connectivitycheck.gstatic.com/generate_204`. You can override this with your own infrastructure via `DefaultConnectivityMonitor(reachabilityUrl: '...')`.
+1. **`copyToSandbox: false`** — you must keep the source file alive. Do not pass raw `content://` / `PHAsset` URIs; resolve to a real filesystem path first.
+2. **Checksum timing** — by default checksum runs at upload start. Set `pinChecksumAtEnqueue: true` to pin earlier (slower enqueue on large files).
+3. **`staleLockThreshold`** — default 5 minutes; must be ≥ `heartbeatInterval * 3`. Increase if uploads routinely exceed the threshold, or another worker may steal the lock.
+4. **Serial worker** — one upload at a time by design.
 
 ---
 
-## 🤝 Contributing
+## Security
 
-We welcome contributions! 
-* 🐛 **Bug Reports:** [Open an Issue](https://github.com/cengizhankkaya/offline_upload_queue/issues)
-* 💡 **Feature Requests:** [Discussions](https://github.com/cengizhankkaya/offline_upload_queue/discussions)
-* 🔀 **Pull Requests:** Ensure all tests pass (`flutter test`) and code is formatted (`dart format .`).
+- **`encryptionKey`** — encrypts the Sembast file with an unaudited Salsa20+SHA256 sample codec (no MAC/AEAD). Prefer OS disk encryption and avoid storing PII in metadata for strict compliance.
+- **`MetadataCodec`** — encrypt only the metadata field without encrypting the whole DB.
+- **Reachability** — default probe is `https://connectivitycheck.gstatic.com/generate_204`. Override with `DefaultConnectivityMonitor(reachabilityUrl: '...')`.
 
-## 📄 License
+---
 
-Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
+## When not to use
+
+- You need **chunked / resumable** uploads (planned for a later major; v1 is whole-file).
+- You need **web / desktop** — this package targets iOS & Android only.
+- A single fire-and-forget request with no offline queue is enough — use Dio directly.
+- You require a **guaranteed** background upload SLA — no mobile OS provides that without user-visible foreground work.
+
+---
+
+## Links
+
+- [pub.dev](https://pub.dev/packages/offline_upload_queue)
+- [API reference](https://pub.dev/documentation/offline_upload_queue/latest/)
+- [Example app](example/)
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
+- [Issues](https://github.com/cengizhankkaya/offline_upload_queue/issues)
+
+## License
+
+MIT — see [LICENSE](LICENSE).

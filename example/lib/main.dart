@@ -13,9 +13,9 @@ import 'screens/error_screen.dart';
 import 'screens/disk_screen.dart';
 import 'screens/debug_screen.dart';
 
-/// Demo adapter — yanıt vermiyor ama API'yi göstermek için yeterli.
+/// Demo adapter — simulates a 2s upload with progress.
 ///
-/// Gerçek uygulamada `RestUploadAdapter(baseUrl: 'https://...')` kullanın.
+/// Use `RestUploadAdapter(baseUrl: 'https://...')` in production.
 class MockUploadAdapter implements UploadAdapter {
   @override
   Future<UploadResult> uploadFile({
@@ -26,7 +26,6 @@ class MockUploadAdapter implements UploadAdapter {
     void Function(int sent, int total)? onProgress,
     UploadCancelToken? cancelToken,
   }) async {
-    // Simulate a 2-second upload with progress
     if (metadata['demo'] == 'error_case') {
       return const UploadResult.failure(FailureType.fileNotFound);
     }
@@ -43,8 +42,7 @@ class MockUploadAdapter implements UploadAdapter {
 }
 
 class ExampleRestAdapter implements UploadAdapter {
-  // TODO: Update this to your development machine's local IP address
-  // For Android Emulator, use 10.0.2.2. For iOS Simulator, use localhost.
+  // For Android Emulator use 10.0.2.2; for iOS Simulator use localhost.
   final String baseUrl = Platform.isAndroid
       ? 'http://10.0.2.2:8080'
       : 'http://localhost:8080';
@@ -112,7 +110,7 @@ final uploadQueue = UploadQueue(
   advanced: UploadQueueAdvancedOptions(
     diskUsageWarningBytes: 50 * 1024 * 1024, // 50 MB
     onDiskUsageWarning: (current, limit) {
-      final msg = '⚠️ Disk uyarısı: $current / $limit byte';
+      final msg = 'Disk warning: $current / $limit bytes';
       debugPrint(msg);
       globalLogsNotifier.value = [
         ...globalLogsNotifier.value,
@@ -143,14 +141,11 @@ void main() async {
       onAppRefresh: () => BackgroundTaskRunner.run(uploadQueue),
       onProcessing: () => BackgroundTaskRunner.run(uploadQueue),
       onExpiration: () {
-        // Paylaşılan foreground kuyruğunu dispose etme — yalnızca aktif upload'ı kes.
+        // Do not dispose the shared foreground queue — only abort in-flight work.
         unawaited(uploadQueue.abortActiveUploads());
       },
     );
   }
-
-  // FutureBuilder içinde çağrılacak
-  // uploadQueue.init() burada çağrılmıyor.
 
   runApp(const OfflineUploadQueueDemoApp());
 }
@@ -213,13 +208,13 @@ class _MainShellState extends State<MainShell> {
                 children: [
                   CircularProgressIndicator(),
                   SizedBox(height: 16),
-                  Text('Kuyruk başlatılıyor... (Kilit bekleniyor olabilir)'),
+                  Text('Starting queue… (may be waiting for lock)'),
                 ],
               ),
             );
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Hata: ${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
           return _screens[_selectedIndex];
         },
@@ -231,7 +226,7 @@ class _MainShellState extends State<MainShell> {
           NavigationDestination(
             icon: Icon(Icons.upload_outlined),
             selectedIcon: Icon(Icons.upload),
-            label: 'Kuyruk',
+            label: 'Queue',
           ),
           NavigationDestination(
             icon: Icon(Icons.signal_cellular_alt_outlined),
@@ -241,7 +236,7 @@ class _MainShellState extends State<MainShell> {
           NavigationDestination(
             icon: Icon(Icons.error_outline),
             selectedIcon: Icon(Icons.error),
-            label: 'Hata',
+            label: 'Errors',
           ),
           NavigationDestination(
             icon: Icon(Icons.storage_outlined),

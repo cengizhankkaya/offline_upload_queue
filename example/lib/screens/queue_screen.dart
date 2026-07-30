@@ -5,14 +5,7 @@ import 'package:offline_upload_queue/offline_upload_queue.dart';
 
 import '../main.dart';
 
-/// Sekme 1: Temel kuyruk kullanımı.
-///
-/// Gösterilen API'ler:
-///   - `image_picker` ile dosya seçme
-///   - `enqueue()` ile kuyruğa ekleme
-///   - `watchSummary()` ile canlı sayaç
-///   - `watchTasks()` ile görev listesi (liste index'i kullanılır, sequenceNumber değil)
-///   - `cancel()` ve `purge()`
+/// Tab 1: Core queue usage — enqueue, watchSummary, watchTasks, cancel, purge.
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});
 
@@ -32,7 +25,6 @@ class QueueScreen extends StatelessWidget {
 
     await uploadQueue.enqueueBatch(items);
 
-    // Arka plan işleyicisini uyar
     try {
       if (Platform.isAndroid) {
         await AndroidBackgroundRunner.scheduleNextRun();
@@ -51,7 +43,7 @@ class QueueScreen extends StatelessWidget {
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${files.length} dosya kuyruğa eklendi')),
+        SnackBar(content: Text('${files.length} file(s) enqueued')),
       );
     }
   }
@@ -61,12 +53,11 @@ class QueueScreen extends StatelessWidget {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kuyruk — enqueue + watchSummary'),
+        title: const Text('Queue — enqueue + watchSummary'),
         centerTitle: true,
       ),
       body: Column(
         children: [
-          // ── Canlı özet banner ──────────────────────────────────────────────
           StreamBuilder<QueueSummary>(
             stream: uploadQueue.watchSummary(),
             builder: (context, snap) {
@@ -85,22 +76,22 @@ class QueueScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _StatChip(
-                            label: 'Bekliyor',
+                            label: 'Pending',
                             value: s.pending,
                             color: Colors.orangeAccent,
                           ),
                           _StatChip(
-                            label: 'Yükleniyor',
+                            label: 'Uploading',
                             value: s.uploading,
                             color: Colors.blueAccent,
                           ),
                           _StatChip(
-                            label: 'Tamamlandı',
+                            label: 'Completed',
                             value: s.completed,
                             color: Colors.greenAccent,
                           ),
                           _StatChip(
-                            label: 'Hata',
+                            label: 'Failed',
                             value: s.permanentlyFailed,
                             color: Colors.redAccent,
                           ),
@@ -110,12 +101,10 @@ class QueueScreen extends StatelessWidget {
             },
           ),
 
-          // ── Genel İlerleme (Overall Progress) ───────────────────────────────
           StreamBuilder<double>(
             stream: uploadQueue.watchOverallProgress(),
             builder: (context, snap) {
               final progress = snap.data ?? 0.0;
-              // 0.0 veya 1.0 (hiç işlem yok veya bitti) ise çubuğu gizle
               if (progress == 0.0 || progress == 1.0) {
                 return const SizedBox.shrink();
               }
@@ -128,7 +117,7 @@ class QueueScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Genel İlerleme: ${(progress * 100).toStringAsFixed(1)}%',
+                      'Overall progress: ${(progress * 100).toStringAsFixed(1)}%',
                       style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(height: 6),
@@ -142,7 +131,6 @@ class QueueScreen extends StatelessWidget {
             },
           ),
 
-          // ── Görev listesi (index kullanılır, sequenceNumber değil) ─────────
           Expanded(
             child: StreamBuilder<List<UploadTask>>(
               stream: uploadQueue.watchTasks(limit: 30),
@@ -151,7 +139,7 @@ class QueueScreen extends StatelessWidget {
                 if (tasks.isEmpty) {
                   return const Center(
                     child: Text(
-                      'Kuyruk boş.\nGaleri\'den fotoğraf seç.',
+                      'Queue is empty.\nPick photos from the gallery.',
                       textAlign: TextAlign.center,
                     ),
                   );
@@ -162,7 +150,6 @@ class QueueScreen extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final task = tasks[index];
                     return _TaskTile(
-                      // UI'da "N. sıra" için liste index'i kullanılır (plan §5)
                       position: index + 1,
                       task: task,
                     );
@@ -176,7 +163,7 @@ class QueueScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _pickAndEnqueue(context),
         icon: const Icon(Icons.add_photo_alternate_outlined),
-        label: const Text('Fotoğraf Ekle'),
+        label: const Text('Add photos'),
       ),
     );
   }
@@ -269,14 +256,14 @@ class _TaskTile extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.cancel_outlined),
                 onPressed: () => uploadQueue.cancel(task.taskId),
-                tooltip: 'İptal',
+                tooltip: 'Cancel',
               ),
             if (task.status == UploadStatus.cancelled ||
                 task.status == UploadStatus.permanentlyFailed)
               IconButton(
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () => uploadQueue.purge(task.taskId),
-                tooltip: 'Sil',
+                tooltip: 'Delete',
               ),
           ],
         ),

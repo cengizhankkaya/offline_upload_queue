@@ -7,21 +7,12 @@ import 'package:path_provider/path_provider.dart';
 
 import '../main.dart';
 
-/// Sekme 3: Hata yönetimi.
-///
-/// Gösterilen API'ler:
-///   - `permanentlyFailed` sonrası `retry()` (plan §4, §1 test #16)
-///   - `purge()` — tekli silme
-///   - `purgeAllFailed()` — toplu silme
-///   - Kasıtlı hata üretmek için var olmayan bir dosya yolu enqueue edilir.
-
+/// Tab 3: Error handling — permanentlyFailed, retry(), purge().
 class ErrorScreen extends StatelessWidget {
   const ErrorScreen({super.key});
 
   Future<void> _enqueueNonExistent(BuildContext context) async {
-    // QueueController.enqueue dosyanın gerçekten var olmasını bekler.
-    // Bu yüzden geçici bir dosya yaratıp kuyruğa ekliyoruz. MockUploadAdapter
-    // metadata'daki 'demo': 'error_case' değerini görüp fileNotFound hatası dönecek.
+    // enqueue() requires a real file path; MockUploadAdapter fails on demo:error_case.
     final tempDir = await getTemporaryDirectory();
     final bogusFile = File('${tempDir.path}/dummy_error_file.jpg');
     if (!bogusFile.existsSync()) {
@@ -36,7 +27,7 @@ class ErrorScreen extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Hatalı dosya eklendi — kısa süre içinde permanentlyFailed olacak',
+            'Error file enqueued — will become permanentlyFailed shortly',
           ),
         ),
       );
@@ -51,7 +42,7 @@ class ErrorScreen extends StatelessWidget {
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Gerçek dosya eklendi')));
+      ).showSnackBar(const SnackBar(content: Text('Real file enqueued')));
     }
   }
 
@@ -60,7 +51,7 @@ class ErrorScreen extends StatelessWidget {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hata Yönetimi — retry & purge'),
+        title: const Text('Error handling — retry & purge'),
         centerTitle: true,
       ),
       body: Column(
@@ -72,8 +63,8 @@ class ErrorScreen extends StatelessWidget {
               child: const Padding(
                 padding: EdgeInsets.all(14),
                 child: Text(
-                  '"Var Olmayan Dosya Ekle" butonu kasıtlı hata üretir.\n'
-                  'Görev permanentlyFailed durumuna düşünce retry() veya purge() kullanabilirsiniz.',
+                  '"Enqueue error file" intentionally fails.\n'
+                  'Once the task is permanentlyFailed, use retry() or purge().',
                   style: TextStyle(fontSize: 13),
                 ),
               ),
@@ -86,21 +77,20 @@ class ErrorScreen extends StatelessWidget {
                 Expanded(
                   child: FilledButton.tonal(
                     onPressed: () => _enqueueNonExistent(context),
-                    child: const Text('Hatalı Dosya Ekle'),
+                    child: const Text('Enqueue error file'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: FilledButton(
                     onPressed: () => _enqueueReal(context),
-                    child: const Text('Gerçek Dosya Ekle'),
+                    child: const Text('Enqueue real file'),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 8),
-          // Toplu temizleme
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(
@@ -111,7 +101,7 @@ class ErrorScreen extends StatelessWidget {
                   color: Colors.redAccent,
                 ),
                 label: const Text(
-                  'Tüm Kalıcı Hataları Sil (purgeAllFailed)',
+                  'Purge all permanent failures',
                   style: TextStyle(color: Colors.redAccent),
                 ),
                 onPressed: () async {
@@ -119,7 +109,7 @@ class ErrorScreen extends StatelessWidget {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Tüm permanentlyFailed görevler silindi'),
+                        content: Text('All permanentlyFailed tasks deleted'),
                       ),
                     );
                   }
@@ -133,7 +123,7 @@ class ErrorScreen extends StatelessWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Başarısız / İptal Edilmiş Görevler',
+                'Failed / cancelled tasks',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
@@ -152,7 +142,7 @@ class ErrorScreen extends StatelessWidget {
                 final tasks = snap.data ?? [];
                 if (tasks.isEmpty) {
                   return const Center(
-                    child: Text('Hata yok 🎉', style: TextStyle(fontSize: 16)),
+                    child: Text('No errors', style: TextStyle(fontSize: 16)),
                   );
                 }
                 return ListView.builder(
@@ -181,13 +171,11 @@ class ErrorScreen extends StatelessWidget {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // retry() → pending'e döner
                             IconButton(
                               icon: const Icon(Icons.refresh),
                               tooltip: 'retry()',
                               onPressed: () => uploadQueue.retry(t.taskId),
                             ),
-                            // purge() → sil
                             IconButton(
                               icon: const Icon(Icons.delete_outline),
                               tooltip: 'purge()',

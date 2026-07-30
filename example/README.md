@@ -1,30 +1,30 @@
 # offline_upload_queue example
 
-Bu uygulama paketin public API'sini ve platform arka plan kurulumunu gösterir.
+Demo app for the package public API and platform background setup.
 
-## Çalıştırma
+## Run
 
 ```bash
-# Opsiyonel: kökteki mock sunucu (ExampleRestAdapter için)
+# Optional: mock server for ExampleRestAdapter
 dart run tool/mock_server.dart
 
 cd example
 flutter run
 ```
 
-## Ekranlar
+## Tabs
 
-| Sekme | Ne test eder |
+| Tab | What it demos |
 |---|---|
-| Kuyruk | enqueue, progress, cancel, özet stream'leri |
+| Queue | enqueue, progress, cancel, summary streams |
 | Cellular | `wifiOnly` + `forceUploadOnce` |
-| Hata | kalıcı / geçici hata ve retry |
-| Disk | sandbox kullanımı ve uyarı eşiği |
-| Debug | loglar, pause/resume, purge |
+| Errors | permanent / transient failure and retry |
+| Disk | sandbox usage and warning threshold |
+| Debug | logs, pause/resume signals |
 
-## Platform kurulumu
+## Platform setup
 
-- **iOS:** `Info.plist` BGTask kimlikleri + `AppDelegate.swift` MethodChannel
-- **Android:** `Workmanager` `callbackDispatcher` + `RECEIVE_BOOT_COMPLETED`
+- **iOS:** `Info.plist` BGTask IDs + `AppDelegate.swift` MethodChannel
+- **Android:** Workmanager `callbackDispatcher` + `RECEIVE_BOOT_COMPLETED`
 
-Ayrıntılar için kök [README.md](../README.md) içindeki Background Sync bölümüne bakın.
+See the root [README.md](../README.md) Background Sync section for details.

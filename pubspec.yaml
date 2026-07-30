@@ -11,6 +11,16 @@ topics:
   - queue
   - sembast
 
+screenshots:
+  - description: Live queue with pending, uploading, and completed tasks plus overall progress.
+    path: doc/screenshots/queue_active.jpeg
+  - description: Batch enqueue feedback — snackbar after adding multiple photos.
+    path: doc/screenshots/queue_enqueued.jpeg
+  - description: Wi-Fi only queue with forceUploadOnce() cellular bypass.
+    path: doc/screenshots/cellular_force_upload.jpeg
+  - description: Upload task state machine (pending → uploading → completed / failed / cancelled).
+    path: doc/screenshots/state_machine.jpg
+
 platforms:
   android:
   ios:

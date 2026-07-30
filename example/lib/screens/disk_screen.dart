@@ -3,14 +3,7 @@ import 'package:offline_upload_queue/offline_upload_queue.dart';
 
 import '../main.dart';
 
-/// Sekme 4: Disk kullanımı ve kuyruk özeti.
-///
-/// Gösterilen API'ler:
-///   - `estimatedDiskUsageBytes` — anlık disk kullanımı
-///   - `watchSummary()` — tüm sayaçlar
-///   - `purgeAllCompleted()` — tamamlananları temizle
-///   - `purgeAllCancelled()` — iptal edilenleri temizle
-
+/// Tab 4: Disk usage and queue summary — estimatedDiskUsageBytes, purge helpers.
 class DiskScreen extends StatelessWidget {
   const DiskScreen({super.key});
 
@@ -25,7 +18,7 @@ class DiskScreen extends StatelessWidget {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Disk & Özet — estimatedDiskUsageBytes'),
+        title: const Text('Disk & summary — estimatedDiskUsageBytes'),
         centerTitle: true,
       ),
       body: StreamBuilder<QueueSummary>(
@@ -39,7 +32,6 @@ class DiskScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Disk kullanımı göstergesi
               Card(
                 color: theme.colorScheme.primaryContainer,
                 child: Padding(
@@ -56,13 +48,14 @@ class DiskScreen extends StatelessWidget {
                         ),
                       ),
                       const Text(
-                        'Tahmini Disk Kullanımı',
+                        'Estimated disk usage',
                         style: TextStyle(fontSize: 13),
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'copyToSandbox: true → pending/failed görevlerin\n'
-                        'sandbox kopyaları burada sayılır (~2× disk maliyeti).',
+                        'copyToSandbox: true — sandbox copies for\n'
+                        'pending/failed tasks are counted here\n'
+                        '(~2× cost when hardlink falls back to a full copy).',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 11,
@@ -75,7 +68,6 @@ class DiskScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Tüm durum sayaçları
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -83,7 +75,7 @@ class DiskScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Durum Özeti',
+                        'Status summary',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -101,16 +93,15 @@ class DiskScreen extends StatelessWidget {
                       ),
                       _SummaryRow('cancelled', s.cancelled, Colors.grey),
                       const Divider(),
-                      _SummaryRow('TOPLAM', s.total, theme.colorScheme.primary),
+                      _SummaryRow('TOTAL', s.total, theme.colorScheme.primary),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Temizleme butonları
               const Text(
-                'Temizlik',
+                'Cleanup',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
               const SizedBox(height: 8),
@@ -119,14 +110,14 @@ class DiskScreen extends StatelessWidget {
                 onPressed: s.completed > 0
                     ? () => uploadQueue.purgeAllCompleted()
                     : null,
-                child: Text('Tamamlananları Sil (${s.completed} kayıt)'),
+                child: Text('Purge completed (${s.completed} records)'),
               ),
               const SizedBox(height: 8),
               FilledButton.tonal(
                 onPressed: s.cancelled > 0
                     ? () => uploadQueue.purgeAllCancelled()
                     : null,
-                child: Text('İptal Edilenleri Sil (${s.cancelled} kayıt)'),
+                child: Text('Purge cancelled (${s.cancelled} records)'),
               ),
               const SizedBox(height: 8),
               FilledButton.tonal(
@@ -138,7 +129,7 @@ class DiskScreen extends StatelessWidget {
                   foregroundColor: Colors.redAccent,
                 ),
                 child: Text(
-                  'Kalıcı Hataları Sil (${s.permanentlyFailed} kayıt)',
+                  'Purge permanent failures (${s.permanentlyFailed} records)',
                 ),
               ),
             ],
